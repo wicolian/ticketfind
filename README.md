@@ -58,7 +58,7 @@ Want another site? Adding one is a single file. See [docs/adapters.md](docs/adap
 
 ## Public website
 
-Explore and live seats also run as a website on Vercel. See [DEPLOY.md](DEPLOY.md). Environment variables: [.env.example](.env.example).
+Explore and live seats also run as a website: **https://ticketfind.vercel.app**. Every push to `main` deploys it. See [DEPLOY.md](DEPLOY.md). Environment variables: [.env.example](.env.example).
 
 ## Develop
 
