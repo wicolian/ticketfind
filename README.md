@@ -29,7 +29,7 @@ Discord, Slack and Telegram work too (paste a webhook, or a bot token and chat I
 
 ### Plain words (optional)
 
-Add a [Claude API key](https://console.anthropic.com/) under **Alerts** and type what you want instead of filling fields: *"2 seats together, not the front 4 rows, English, before 7 pm on the 17th or 18th"*. On any other site, Claude reads the page and picks the words that mean "on sale". The key stays on your computer. Without one, you fill the same fields by hand.
+Add an AI key under **Alerts**, either a [Claude API key](https://console.anthropic.com/) or an [OpenRouter](https://openrouter.ai/) key (it uses Claude Haiku 5.5, about $0.0002 per request), and type what you want instead of filling fields: *"2 seats together, not the front 4 rows, English, before 7 pm on the 17th or 18th"*. On any other site, Claude reads the page and picks the words that mean "on sale". The key stays on your computer. Without one, you fill the same fields by hand.
 
 ## What it can watch
 
