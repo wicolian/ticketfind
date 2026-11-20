@@ -104,17 +104,42 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate }: {
   const [data, setData] = useState<{ days: string[]; date?: string; cinemas: CinemaShows[] } | null>(null);
   const [date, setDate] = useState<string | undefined>();
   const [error, setError] = useState("");
-  const [group, setGroup] = useState(2);
-  const [skip, setSkip] = useState(4);
-  const [lang, setLang] = useState("All");
+  // Preferences stick across movies and visits.
+  const saved = (() => { try { return JSON.parse(localStorage.getItem("tf.prefs") ?? "{}"); } catch { return {}; } })();
+  const [group, setGroup] = useState<number>(saved.group ?? 2);
+  const [skip, setSkip] = useState<number>(saved.skip ?? 4);
+  const [lang, setLang] = useState<string>(saved.lang ?? "All");
+  const [updatedAt, setUpdatedAt] = useState(0);
+  const [, tick] = useState(0);
+  const [allWatch, setAllWatch] = useState<"" | "busy" | string>("");
+  useEffect(() => {
+    try { localStorage.setItem("tf.prefs", JSON.stringify({ group, skip, lang })); } catch { /* private window */ }
+  }, [group, skip, lang]);
   const [openOnly, setOpenOnly] = useState(false);
   const [picked, setPicked] = useState<{ cinema: string; ref: string } | null>(null);
 
   useEffect(() => {
     setData(null);
     setError("");
-    api.shows(city, movie.id, date, where).then((r) => { setData(r); setDate(r.date); }).catch((e) => setError((e as Error).message));
+    const load = () => api.shows(city, movie.id, date, where).then((r) => { setData(r); setDate(r.date); setUpdatedAt(Date.now()); setError(""); }).catch((e) => setError((e as Error).message));
+    load();
+    // Live: refresh show statuses every 30 seconds while the page is visible.
+    const t = window.setInterval(() => { if (document.visibilityState === "visible") load(); }, 30_000);
+    const clock = window.setInterval(() => tick((n) => n + 1), 5_000);
+    return () => { window.clearInterval(t); window.clearInterval(clock); };
   }, [city, movie.id, date, where?.lat, where?.lng]);
+
+  async function watchAll() {
+    if (!date) return;
+    setAllWatch("busy");
+    const want: Want = {
+      seats: group, together: group > 1, skipFrontRows: skip, dates: [date],
+      languages: lang === "All" ? [] : [lang.toLowerCase()], venues: [],
+      ...(where ? { near: { ...where, km: 10 } } : {}),
+    };
+    const id = await onWatch(movie.link, want, `${movie.title} on ${dayLabel(date).dow} ${dayLabel(date).day} ${dayLabel(date).mon}`);
+    setAllWatch(id);
+  }
 
   const langs = useMemo(() => ["All", ...new Set((data?.cinemas ?? []).flatMap((c) => c.shows.map((s) => s.language)).filter(Boolean))], [data]);
   const cinemas = (data?.cinemas ?? [])
@@ -163,6 +188,15 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate }: {
         )}
         <label className="check pref-check"><input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} /> Only shows with seats</label>
         {!where && <button className="btn btn-sm" onClick={onLocate}>Sort by distance</button>}
+        <div className="prefs-cta">
+          {allWatch && allWatch !== "busy" ? (
+            <span className="row"><span className="done-note" role="status">Watching every show that fits</span><button className="btn btn-ghost btn-sm" onClick={async () => { await api.remove(allWatch); setAllWatch(""); }}>Stop</button></span>
+          ) : (
+            <button className="btn btn-primary btn-sm" onClick={watchAll} disabled={!date || allWatch === "busy"} title="One watch for every show on this date that fits these settings">
+              {allWatch === "busy" ? "Starting..." : "Ping me for any show that fits"}
+            </button>
+          )}
+        </div>
       </div>
 
       {error ? (
@@ -177,7 +211,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate }: {
       ) : (
         <>
           <p className="faint" style={{ fontSize: 13, margin: "0 0 8px" }}>
-            {cinemas.length} cinemas, {openShows} shows with seats{where ? ", nearest first" : ""}. Tap a time to check seats.
+            <span className="live-dot" aria-hidden="true" /> Live, updated {Math.max(0, Math.round((Date.now() - updatedAt) / 1000))}s ago. {cinemas.length} cinemas, {openShows} shows with seats{where ? ", nearest first" : ""}. Tap a time to check seats.
           </p>
           <div className="stack">
             {cinemas.map((c) => (

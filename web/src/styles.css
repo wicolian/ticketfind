@@ -334,3 +334,11 @@ a { color: inherit; }
 .wmenu-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
 .bulk { display: flex; gap: 4px; align-items: center; }
 @media (max-width: 640px) { .wmenu-pop { position: fixed; left: 16px; right: 16px; top: 64px; width: auto; } }
+
+/* Quality of life */
+.search-row { margin-bottom: 12px; max-width: 420px; }
+.input.search { min-height: 40px; border-radius: 999px; padding-left: 16px; }
+.prefs-cta { margin-left: auto; }
+.live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 4px; vertical-align: 1px; animation: pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+@media (max-width: 640px) { .prefs-cta { margin-left: 0; width: 100%; } .prefs-cta .btn { width: 100%; } }

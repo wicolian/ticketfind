@@ -6,6 +6,7 @@ export function ExplorePage({ city, onOpen }: { city: string; onOpen: (m: Movie)
   const [error, setError] = useState("");
   const [lang, setLang] = useState("All");
   const [advanceOnly, setAdvanceOnly] = useState(false);
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     setMovies(null);
@@ -19,7 +20,8 @@ export function ExplorePage({ city, onOpen }: { city: string; onOpen: (m: Movie)
     return ["All", ...[...count.entries()].sort((a, b) => b[1] - a[1]).map(([l]) => l)];
   }, [movies]);
 
-  const shown = (movies ?? []).filter((m) => (lang === "All" || m.languages.includes(lang)) && (!advanceOnly || m.advance));
+  const needle = q.trim().toLowerCase();
+  const shown = (movies ?? []).filter((m) => (lang === "All" || m.languages.includes(lang)) && (!advanceOnly || m.advance) && (!needle || m.title.toLowerCase().includes(needle)));
   const advanceCount = (movies ?? []).filter((m) => m.advance).length;
 
   return (
@@ -29,6 +31,17 @@ export function ExplorePage({ city, onOpen }: { city: string; onOpen: (m: Movie)
         <p className="muted" style={{ margin: 0 }}>Live seats at PVR and INOX cinemas. Pick a movie to see show times near you.</p>
       </div>
 
+      <div className="search-row">
+        <input
+          className="input search"
+          type="search"
+          placeholder="Search movies"
+          aria-label="Search movies"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && shown.length === 1) onOpen(shown[0]); }}
+        />
+      </div>
       <div className="chips" role="toolbar" aria-label="Filter movies">
         {languages.map((l) => (
           <button key={l} className="chip" aria-pressed={lang === l} onClick={() => setLang(l)}>{l}</button>
@@ -48,9 +61,9 @@ export function ExplorePage({ city, onOpen }: { city: string; onOpen: (m: Movie)
         </div>
       ) : shown.length === 0 ? (
         <div className="card empty">
-          <h3>No {lang} movies here right now</h3>
-          <p>Try another language, or switch city at the top.</p>
-          <button className="btn" style={{ marginTop: 12 }} onClick={() => { setLang("All"); setAdvanceOnly(false); }}>Show all movies</button>
+          <h3>{needle ? `Nothing matches "${q.trim()}"` : `No ${lang} movies here right now`}</h3>
+          <p>{needle ? "Check the spelling, or clear the search." : "Try another language, or switch city at the top."}</p>
+          <button className="btn" style={{ marginTop: 12 }} onClick={() => { setLang("All"); setAdvanceOnly(false); setQ(""); }}>Show all movies</button>
         </div>
       ) : (
         <div className="posters">
