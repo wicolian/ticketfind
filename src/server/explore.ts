@@ -3,6 +3,7 @@
 // so browsing never hammers a site that may already be under load.
 import { distanceKm, pickSeats, type Row } from "./rules.js";
 import { BROWSER_UA } from "./adapters/types.js";
+import { districtSeatMap, keyOf, refOf } from "./districtSeats.js";
 
 const API = "https://api3.inoxmovies.com/api/v1/booking/";
 const cache = new Map<string, { at: number; value: unknown }>();
@@ -302,7 +303,7 @@ async function districtShows(movieUrl: string, date: string, at?: { lat: number;
           screen: "",
           status,
           statusText: free > 0 ? `${free} free` : "Sold out",
-          ref: `district:${c.entityCode}:${s.sid}`,
+          ref: refOf({ cid: String(c.entityCode), sid: String(s.sid), pid: String(s.pid), mid: String(s.mid), fid: String(s.fid), fmt: String(s.scrnFmt || "2D"), contentId, date, city: String(ms?.meta?.city ?? "") || cityFromUrl(movieUrl) }),
           bookUrl: `${DISTRICT}/movies/seat-layout/${s.fid}?encsessionid=${c.entityCode}-${s.sid}-${String(s.mid).toLowerCase()}-${c.entityCode}&freeseating=false&fromsessions=&type=MOVIES&contentid=${contentId}&sessionid=${s.sid}`,
           source: "district" as const,
           free,
@@ -316,6 +317,8 @@ async function districtShows(movieUrl: string, date: string, at?: { lat: number;
   }
   return out;
 }
+
+const cityFromUrl = (u: string) => /-movie-tickets-in-([a-z-]+)-MV/.exec(u)?.[1] ?? "";
 
 /** The next n days starting from a date (YYYY-MM-DD). */
 function daysFrom(first: string, n: number): string[] {
@@ -392,7 +395,32 @@ export async function shows(city: string, movieId: string, date: string | undefi
 }
 
 /** Live seats for one show: free seats outside the front rows and the best block for the group. */
+async function districtSeats(ref: string, group: number, skipFrontRows: number) {
+  const k = keyOf(ref)!;
+  let rows;
+  try {
+    rows = await districtSeatMap(k);
+  } catch (e) {
+    return { ok: false as const, reason: (e as Error).message };
+  }
+  const total = rows.reduce((n, r) => n + r.seats.length, 0);
+  const freeAll = rows.reduce((n, r) => n + r.seats.filter((s) => s.free).length, 0);
+  const pick = pickSeats(rows, { seats: group, together: group > 1, skipFrontRows });
+  return {
+    ok: true as const,
+    total,
+    free: freeAll,
+    freeGood: pick.free,
+    best: [...pick.seats].sort((a, b) => a.localeCompare(b, "en", { numeric: true })),
+    price: undefined as number | undefined,
+    area: pick.seats[0] ? rows.find((r) => pick.seats[0].startsWith(r.name))?.area : undefined,
+    classes: undefined as { label: string; price: number }[] | undefined,
+    map: rows.map((r, i) => ({ row: r.name, front: i < skipFrontRows, seats: [...r.seats].sort((a, b) => a.pos - b.pos).map((s) => (s.free ? 1 : 0)) })),
+  };
+}
+
 export async function seats(city: string, date: string, ref: string, group: number, skipFrontRows: number) {
+  if (ref.startsWith("district|")) return districtSeats(ref, group, skipFrontRows);
   const res = await post("ticketing/seatlayout", city, { dated: date, encrypted: ref, onPage: false, layoutType: "NEW" }, 10);
   const out = res?.output;
   if (!out?.rows) return { ok: false as const, reason: String(res?.msg || "The cinema did not answer.") };

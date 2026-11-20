@@ -27,7 +27,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
   const fromDistrict = show.source === "district";
   useEffect(() => {
     setSeats(null);
-    if (shut || fromDistrict) return;
+    if (shut) return;
     api.seats(city, date, show.ref, group, skip).then(setSeats).catch((e) => setSeats({ ok: false, reason: (e as Error).message }));
   }, [city, date, show.ref, group, skip, shut]);
 
@@ -59,7 +59,8 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
     setWatching("");
   }
 
-  const districtGood = fromDistrict && !shut && (show.free ?? 0) >= group;
+  // District counts are the fallback when its seat map does not answer.
+  const districtGood = fromDistrict && !shut && !seats?.ok && (show.free ?? 0) >= group;
   const good = (seats?.ok && seats.best.length > 0) || districtGood;
   return (
     <div className="seat-panel" role="region" aria-label={`Seats for ${show.time}`}>
@@ -67,7 +68,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
         <div>
           <strong>{show.time.replace(/^0/, "")}</strong> <span className="muted">{[show.language, show.screen].filter(Boolean).join(", ")}</span>
           <div className="seat-verdict">
-            {fromDistrict && !shut ? (
+            {fromDistrict && !shut && seats !== null && !seats.ok ? (
               <span>{districtGood ? <b className="ok">About {show.free} seats free.</b> : <>Only {show.free} free, fewer than {group}.</>} District's count can lag a little. You pick the exact seats on District.</span>
             ) : shut ? (
               <span>{show.status === "full" ? "Sold out right now." : "Not on sale right now."} Seats often come back when other people's holds expire.</span>
@@ -354,7 +355,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
                 <div className="spread">
                   <h3>{c.name}</h3>
                   <span className="row" style={{ gap: 10, flexWrap: "nowrap" }}>
-                    <span className="src-tag" title={c.source === "district" ? "Show times and free-seat counts from District" : "Exact seats from PVR INOX"}>{c.source === "district" ? "Seat counts" : "Exact seats"}</span>
+                    <span className="src-tag" title={c.source === "district" ? "Seats and booking on District" : "Seats and booking on PVR INOX"}>{c.source === "district" ? "Books on District" : "Books on PVR INOX"}</span>
                     {c.km !== undefined && <span className="faint mono">{c.km} km</span>}
                   </span>
                 </div>

@@ -75,10 +75,9 @@ async function check(w: BrowserWatch): Promise<Pick<BrowserWatch, "matches" | "s
         if (s.status === "full") { looked++; soldOut++; continue; }
         if (!fits(s, c.name, w.want)) continue;
         looked++;
-        if (s.source === "district") {
+        if (s.source === "district" && (s.free ?? 0) < w.want.seats) {
           if ((s.free ?? 0) <= 0) soldOut++;
-          if ((s.free ?? 0) >= w.want.seats) matches.push({ when: `${niceDay(day)}, ${s.time.replace(/^0/, "")}`, venue: c.name, seats: [], free: s.free ?? 0, bookUrl: s.bookUrl });
-          continue;
+          continue; // not enough free seats by District's own count: no need to open the seat map
         }
         if (seatChecks >= MAX_SEAT_CHECKS) continue;
         seatChecks++;

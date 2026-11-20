@@ -8,7 +8,7 @@ First-day shows, concerts, festival buses, a sold-out gig that drops 20 seats at
 
 ![ticketfind found seats](docs/img/seats-open-dark.png)
 
-- **Explore every cinema in town.** Pick your city (or let it find you), browse what's showing, and see every show time by cinema, nearest first, colour-coded by real seat status: exact seats at PVR and INOX, show times and free-seat counts from District for everyone else (AGS, Cinepolis, Kasi, Sangam, single screens...). Tap a time to check live seats and the best block for your group, then book or get pinged.
+- **Explore every cinema in town.** Pick your city (or let it find you), browse what's showing, and see every show time by cinema, nearest first, colour-coded by real seat status: exact seats everywhere: PVR INOX from its own site, and every other cinema (AGS, Cinepolis, Kasi, Sangam, single screens...) from District's seat maps. Tap a time to check live seats and the best block for your group, then book or get pinged.
 - **Notifies in your browser.** On the website, tap Ping me and keep the tab open (even in the background): ticketfind checks every minute and sends a browser notification when seats open. The app below is optional, for alerts with the browser closed and on your phone.
 - **Knows down from sold out.** If the cinema's site is failing, it says so and keeps trying. It gives up only when a show stays truly sold out for 30 minutes with the site answering, or when the show starts.
 - **Runs on your computer.** No account, no server, no Supabase. Your settings live in `~/.ticketfind`.
@@ -41,7 +41,7 @@ Add an AI key under **Alerts**, either a [Claude API key](https://console.anthro
 | Site | What ticketfind sees | Paste this link |
 |---|---|---|
 | **PVR INOX** (inoxmovies.com, pvrcinemas.com) | Exact seats. Picks the best block for you. | The page that lists every show time (has `/moviesessions/` in it) |
-| **District** (district.in) | Free-seat count per show. Counts can lag a little. | The movie page that lists every cinema (ends in `-MV` and a number) |
+| **District** (district.in) | Exact seats too: it reads District's seat map, so the counts never fool you (they can lag). | The movie page that lists every cinema (ends in `-MV` and a number) |
 | **Concerts and events** (District events, Eventbrite, Skiddle, Dice, venue sites...) | Watches the event page for words like "Sold out", "Coming soon" or "Book tickets". Add a Claude key and it picks the words for you. | The event page you'd keep refreshing |
 | **With a Jev key** ([TypeSafe](https://typesafe.ai)) | Jev reads concert and event pages and says when tickets can be bought: on sale, sold out, not yet, or unclear. ticketfind pings you only when Jev is at least 70% sure it is on sale. No words to pick. | Add the key under **Alerts** |
 | **Any other page** (buses, sports, plays...) | Same: watches the page for the words that mean "on sale". | The page you'd keep refreshing |
