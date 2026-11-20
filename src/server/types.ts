@@ -28,6 +28,8 @@ export interface PageMarkers {
   openText?: string;
   /** Text that appears while you cannot ("Sold out", "Coming soon"). */
   closedText?: string;
+  /** Let Jev look at a screenshot too (app only; needs agent-browser on this computer). */
+  picture?: boolean;
 }
 
 export type PlatformId = "pvr-inox" | "district" | "page" | "blocked";
