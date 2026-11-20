@@ -23,7 +23,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         cache = 300;
         break;
       case "shows":
-        body = await explore.shows(city, q.movie, q.date, at);
+        body = await explore.shows(city, q.movie, q.date, at, q.dmovie);
         cache = 30;
         break;
       case "seats":

@@ -28,7 +28,7 @@ export function ExplorePage({ city, onOpen }: { city: string; onOpen: (m: Movie)
     <section>
       <div className="explore-head">
         <h1 className="page-title">Now showing in {city}</h1>
-        <p className="muted" style={{ margin: 0 }}>Live seats at PVR and INOX cinemas. Pick a movie to see show times near you.</p>
+        <p className="muted" style={{ margin: 0 }}>Every cinema in town: exact seats at PVR and INOX, show times and free seats everywhere else. Pick a movie to see what's near you.</p>
       </div>
 
       <div className="search-row">

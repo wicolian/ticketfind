@@ -20,9 +20,10 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publ
   const [watching, setWatching] = useState<"" | "busy" | "done">("");
   const shut = show.status === "closed" || show.status === "full";
 
+  const fromDistrict = show.source === "district";
   useEffect(() => {
     setSeats(null);
-    if (shut) return;
+    if (shut || fromDistrict) return;
     api.seats(city, date, show.ref, group, skip).then(setSeats).catch((e) => setSeats({ ok: false, reason: (e as Error).message }));
   }, [city, date, show.ref, group, skip, shut]);
 
@@ -32,7 +33,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publ
     setWatching("busy");
     const [h, m] = show.hhmm.split(":").map(Number);
     const next = `${String(h + Math.floor((m + 1) / 60)).padStart(2, "0")}:${String((m + 1) % 60).padStart(2, "0")}`;
-    await onWatch(movie.link, {
+    await onWatch(fromDistrict && movie.districtUrl ? movie.districtUrl : movie.link, {
       seats: group, together: group > 1, skipFrontRows: skip, dates: [date], languages: show.language ? [show.language.toLowerCase()] : [],
       venues: [word.toLowerCase()], startAfter: show.hhmm, startBefore: next,
     }, `${movie.title}, ${show.time} at ${word}`).then(setWatchId);
@@ -44,14 +45,17 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publ
     setWatching("");
   }
 
-  const good = seats?.ok && seats.best.length > 0;
+  const districtGood = fromDistrict && !shut && (show.free ?? 0) >= group;
+  const good = (seats?.ok && seats.best.length > 0) || districtGood;
   return (
     <div className="seat-panel" role="region" aria-label={`Seats for ${show.time}`}>
       <div className="seat-panel-head">
         <div>
           <strong>{show.time.replace(/^0/, "")}</strong> <span className="muted">{[show.language, show.screen].filter(Boolean).join(", ")}</span>
           <div className="seat-verdict">
-            {shut ? (
+            {fromDistrict && !shut ? (
+              <span>{districtGood ? <b className="ok">About {show.free} seats free.</b> : <>Only {show.free} free, fewer than {group}.</>} District's count can lag a little. You pick the exact seats on District.</span>
+            ) : shut ? (
               <span>{show.status === "full" ? "Sold out right now." : "Not on sale right now."} Seats often come back when other people's holds expire.</span>
             ) : seats === null ? (
               <span className="muted">Checking seats with the cinema...</span>
@@ -68,7 +72,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publ
           {publicMode && !good ? (
             <a className="btn btn-primary" href="https://github.com/wicolian/ticketfind#start" target="_blank" rel="noreferrer">Get pinged with the free app</a>
           ) : good ? (
-            <a className="btn btn-primary" href={show.bookUrl} target="_blank" rel="noreferrer">Book on PVR INOX <External size={14} /></a>
+            <a className="btn btn-primary" href={show.bookUrl} target="_blank" rel="noreferrer">{fromDistrict ? "Book on District" : "Book on PVR INOX"} <External size={14} /></a>
           ) : (
             watching === "done" ? (
               <span className="row"><span className="done-note" role="status">Watching. We'll ping you when seats open.</span><button className="btn btn-ghost btn-sm" onClick={stop}>Stop</button></span>
@@ -146,7 +150,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, publi
   useEffect(() => {
     setData(null);
     setError("");
-    const load = () => api.shows(city, movie.id, date, where).then((r) => { setData(r); setDate(r.date); setUpdatedAt(Date.now()); setError(""); }).catch((e) => setError((e as Error).message));
+    const load = () => api.shows(city, movie.id, date, where, movie.districtUrl).then((r) => { setData(r); setDate(r.date); setUpdatedAt(Date.now()); setError(""); }).catch((e) => setError((e as Error).message));
     load();
     // Live: refresh show statuses every 30 seconds while the page is visible.
     const t = window.setInterval(() => { if (document.visibilityState === "visible") load(); }, 30_000);
@@ -257,7 +261,10 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, publi
               <article key={c.name} className="card cinema">
                 <div className="spread">
                   <h3>{c.name}</h3>
-                  {c.km !== undefined && <span className="faint mono">{c.km} km</span>}
+                  <span className="row" style={{ gap: 10, flexWrap: "nowrap" }}>
+                    <span className="src-tag" title={c.source === "district" ? "Show times and free-seat counts from District" : "Exact seats from PVR INOX"}>{c.source === "district" ? "Seat counts" : "Exact seats"}</span>
+                    {c.km !== undefined && <span className="faint mono">{c.km} km</span>}
+                  </span>
                 </div>
                 <div className="times">
                   {c.shows.map((s) => (
@@ -269,7 +276,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, publi
                       onClick={() => setPicked(picked?.ref === s.ref ? null : { cinema: c.name, ref: s.ref })}
                     >
                       <b>{s.time.replace(/^0/, "")}</b>
-                      <span>{s.screen && s.screen !== "Premium" ? s.screen : s.language}</span>
+                      <span>{s.status === "full" ? "Sold out" : s.source === "district" ? `${s.free} free` : s.screen && s.screen !== "Premium" ? s.screen : s.language}</span>
                     </button>
                   ))}
                 </div>
