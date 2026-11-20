@@ -1,6 +1,6 @@
 import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { api, type City, type Movie, type PublicSettings, type Want, type Watch } from "./api";
+import { api, describeWant, type City, type Movie, type PublicSettings, type Want, type Watch } from "./api";
 import { ExplorePage } from "./explore/ExplorePage";
 import { MoviePage } from "./explore/MoviePage";
 import { NewWatch } from "./components/NewWatch";
@@ -8,6 +8,7 @@ import { SettingsSheet } from "./components/SettingsSheet";
 import { WatchCard } from "./components/WatchCard";
 import { BulkActions, WatchingMenu, serverActions, type WatchActions } from "./components/WatchingMenu";
 import { asWatch, useBrowserWatches } from "./browserWatch";
+import { movieFromUrl, readShared } from "./share";
 import { Bell, Pin, Settings as Gear, Ticket } from "./icons";
 import "./styles.css";
 
@@ -31,11 +32,12 @@ function chime() {
 
 const REPO = "https://github.com/wicolian/ticketfind";
 
-type Route = { page: "explore" } | { page: "movie"; id: string } | { page: "watching" };
+type Route = { page: "explore" } | { page: "movie"; id: string } | { page: "watching" } | { page: "join"; code: string };
 function readRoute(): Route {
   const h = location.hash.replace(/^#\/?/, "");
   if (h.startsWith("movie/")) return { page: "movie", id: h.slice(6) };
   if (h === "watching") return { page: "watching" };
+  if (h.startsWith("join/")) return { page: "join", code: h.slice(5) };
   return { page: "explore" };
 }
 function store<T>(key: string, fallback: T): T {
@@ -103,6 +105,22 @@ function App() {
       () => { setLocating(false); say("Location was blocked. Pick your city instead."); },
       { timeout: 10_000, maximumAge: 600_000 },
     );
+  }
+
+  async function joinShared(code: string) {
+    const x = readShared(code);
+    if (!x) return say("That share link is broken or not for a cinema.");
+    if (isPublic) {
+      const m = movieFromUrl(x.url);
+      if (!m) return say("That share link points to a page ticketfind can't watch.");
+      if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission().catch(() => {});
+      browser.add({ title: `${x.title} in ${m.city}`, label: x.label, city: m.city, movieId: m.movieId, districtUrl: m.districtUrl, link: x.url, want: x.want });
+    } else {
+      const { platform } = await api.inspect(x.url);
+      await api.create({ url: x.url, platform, want: x.want, everySec: 15 });
+    }
+    say(`Watching ${x.title}, ${x.label}. We'll ping you when seats open.`);
+    go("/watching");
   }
 
   async function watchShow(url: string, want: Want, label: string): Promise<string> {
@@ -190,7 +208,33 @@ function App() {
         </div>
       </header>
 
-      {route.page === "explore" ? (
+      {route.page === "join" ? (
+        (() => {
+          const x = readShared(route.code);
+          return (
+            <section className="card hero" style={{ maxWidth: 560 }}>
+              {x ? (
+                <>
+                  <p className="eyebrow-note">A friend shared a watch</p>
+                  <h1 className="page-title">{x.title}</h1>
+                  <p className="muted">{x.label}. {describeWant(x.want)}.</p>
+                  <p className="hint">ticketfind checks it for you and notifies you the moment seats open. Nothing is booked or paid.</p>
+                  <div className="row" style={{ marginTop: 12 }}>
+                    <button className="btn btn-primary" onClick={() => joinShared(route.code)}>Watch this too</button>
+                    <button className="btn btn-ghost" onClick={() => go("/")}>Browse movies instead</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h1 className="page-title">This share link doesn't work</h1>
+                  <p className="muted">It may have been cut off when it was copied. Ask your friend to send it again.</p>
+                  <button className="btn" style={{ marginTop: 12 }} onClick={() => go("/")}>Browse movies</button>
+                </>
+              )}
+            </section>
+          );
+        })()
+      ) : route.page === "explore" ? (
         <ExplorePage city={city} onOpen={(m) => { setMovie(m); go(`/movie/${m.id}`); }} />
       ) : route.page === "movie" ? (
         movie ? (

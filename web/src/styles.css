@@ -370,3 +370,4 @@ a { color: inherit; }
 .price { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .price.gone { text-decoration: line-through; color: var(--text-faint); }
 .time .chip-price { text-transform: none; letter-spacing: 0; color: var(--text-faint); font-size: 11px; }
+.eyebrow-note { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand); margin: 0 0 6px; }
