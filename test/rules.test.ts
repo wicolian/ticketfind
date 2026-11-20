@@ -60,6 +60,16 @@ describe("near me", () => {
   });
 });
 
+describe("dates from plain words", () => {
+  const today = new Date(2026, 10, 20); // 20 Nov 2026
+  it("moves a day that already passed this month to next month", async () => {
+    const { notInPast } = await import("../src/server/ai.js");
+    expect(notInPast("2026-11-17", today)).toBe("2026-12-17");
+    expect(notInPast("2026-11-25", today)).toBe("2026-11-25");
+    expect(notInPast("2026-12-18", today)).toBe("2026-12-18");
+  });
+});
+
 describe("time helpers", () => {
   it("reads 12-hour and ISO times", () => {
     expect(toHHMM("12:30 AM")).toBe("00:30");

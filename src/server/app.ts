@@ -16,7 +16,7 @@ import { DEFAULT_WANT, type Settings } from "./types.js";
 const WEB_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "web");
 
 function apiKey(): string | undefined {
-  return store.settings().anthropicApiKey || process.env.ANTHROPIC_API_KEY || undefined;
+  return store.settings().anthropicApiKey || process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY || undefined;
 }
 
 /** Settings as the UI sees them: secrets reduced to "is it set". */
@@ -57,7 +57,7 @@ export function buildApp(): Hono {
 
   app.post("/api/understand", async (c) => {
     const key = apiKey();
-    if (!key) throw new UserError("Add a Claude API key in Settings to type your wish in plain words.");
+    if (!key) throw new UserError("Add an AI key under Alerts (Anthropic or OpenRouter) to type your wish in plain words.");
     const { url, text, platform } = await c.req.json();
     if (platform.id === "page") {
       const page = await fetchPage(url);

@@ -92,9 +92,9 @@ export function SettingsSheet({ settings, onClose, onSaved }: { settings: Public
           <div className="channel">
             <h4>Plain-words setup (optional)</h4>
             <p className="hint" style={{ marginTop: 0 }}>
-              With a Claude API key you can type "2 seats together, not the front rows, before 7 pm" instead of filling fields. The key stays on this computer.
+              With an AI key you can type "2 seats together, not the front rows, before 7 pm" instead of filling fields. Use an Anthropic key, or an OpenRouter key (it uses Claude Haiku, about $0.0002 per request). The key stays on this computer.
             </p>
-            <input className="input mono" type="password" placeholder="sk-ant-..." value={aiKey} onChange={(e) => setAiKey(e.target.value)} autoComplete="off" />
+            <input className="input mono" type="password" placeholder="sk-ant-... or sk-or-..." value={aiKey} onChange={(e) => setAiKey(e.target.value)} autoComplete="off" />
           </div>
 
           {testResult && (

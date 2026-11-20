@@ -108,7 +108,7 @@ export interface Channels {
 
 export interface Settings {
   channels: Channels;
-  /** Optional. Lets ticketfind read your request in plain words. */
+  /** Optional. Lets ticketfind read your request in plain words. An Anthropic (sk-ant-) or OpenRouter (sk-or-) key. */
   anthropicApiKey?: string;
 }
 
