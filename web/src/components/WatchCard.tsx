@@ -67,10 +67,10 @@ export function WatchCard({ w, onToast }: { w: Watch; onToast: (t: string) => vo
           </button>
           {confirmRemove ? (
             <button className="btn btn-sm btn-danger" onClick={async () => { await api.remove(w.id); onToast("Stopped watching."); }} onBlur={() => setConfirmRemove(false)} autoFocus>
-              Stop and remove
+              Yes, stop watching
             </button>
           ) : (
-            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmRemove(true)}>Remove</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmRemove(true)}>Stop watching</button>
           )}
         </div>
       </div>
