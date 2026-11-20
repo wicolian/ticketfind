@@ -330,8 +330,8 @@ function dedupe(have: CinemaShows[], more: CinemaShows[]): CinemaShows[] {
   return more.filter((c) => !seen.has(cinemaKey(c.name)));
 }
 
-async function chainShows(city: string, title: string, date: string, at?: { lat: number; lng: number }): Promise<CinemaShows[]> {
-  const list = await chainCinemas(city, title, date, at).catch(() => []);
+async function chainShows(city: string, title: string, date: string, at?: { lat: number; lng: number }, on?: OnProgress): Promise<CinemaShows[]> {
+  const list = await chainCinemas(city, title, date, at, on).catch(() => []);
   return list.map(({ chain, cinema, km }) => ({
     name: cinema.name,
     address: cinema.address,
@@ -367,16 +367,37 @@ function daysFrom(first: string, n: number): string[] {
   });
 }
 
-export async function shows(city: string, movieId: string, date: string | undefined, at?: { lat: number; lng: number }, districtUrl?: string) {
+/** One site's answer while show times load, for the "who is slow" list on the movie page. */
+export interface SourceProgress { name: string; state: "asking" | "done" | "failed"; ms?: number; cinemas?: number; note?: string }
+export type OnProgress = (p: SourceProgress) => void;
+
+/** Time one site's call and report it. A failure reports and returns the fallback. */
+export async function timed<T>(name: string, on: OnProgress | undefined, fn: () => Promise<T>, count: (r: T) => number | undefined, fallback?: T): Promise<T> {
+  const t = Date.now();
+  on?.({ name, state: "asking" });
+  try {
+    const r = await fn();
+    on?.({ name, state: "done", ms: Date.now() - t, cinemas: count(r) });
+    return r;
+  } catch (e) {
+    on?.({ name, state: "failed", ms: Date.now() - t, note: (e as Error).message });
+    if (fallback !== undefined) return fallback;
+    throw e;
+  }
+}
+
+export async function shows(city: string, movieId: string, date: string | undefined, at?: { lat: number; lng: number }, districtUrl?: string, on?: OnProgress) {
   // District-only movie: every cinema comes from District.
   if (movieId.startsWith("d") && districtUrl) {
-    const first = nextData(await districtHtml(districtUrl.replace(DISTRICT, "")));
+    const first = await timed("District", on, async () => nextData(await districtHtml(districtUrl.replace(DISTRICT, ""))), () => undefined);
     const ms = first ? (Object.values(first.props?.pageProps?.data?.serverState?.movieSessions ?? {})[0] as any) : null;
     const firstDay: string | undefined = ms?.arrangedSessions?.[0]?.sessions?.[0]?.showDate;
     const days = firstDay ? daysFrom(firstDay, 4) : [];
     const day = date && days.includes(date) ? date : days[0];
-    const cinemas = day ? await districtShows(districtUrl, day, at, true) : [];
-    if (day) cinemas.push(...dedupe(cinemas, await chainShows(city, ms?.movieDetails?.name ?? ms?.meta?.movieName ?? titleFromDistrictUrl(districtUrl), day, at)));
+    const [cinemas, chains] = day
+      ? await Promise.all([districtShows(districtUrl, day, at, true), chainShows(city, ms?.movieDetails?.name ?? ms?.meta?.movieName ?? titleFromDistrictUrl(districtUrl), day, at, on)])
+      : [[], []];
+    cinemas.push(...dedupe(cinemas, chains));
     cinemas.sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity));
     return { days, date: day, cinemas };
   }
@@ -396,11 +417,14 @@ export async function shows(city: string, movieId: string, date: string | undefi
     adFree: false,
     bbt: false,
   });
-  const first = await post("content/msessions", city, body("NA"), 60);
-  const days: string[] = (first?.output?.days ?? []).filter((d: any) => d.enable !== false).map((d: any) => String(d.dt));
-  const day = date && days.includes(date) ? date : days[0];
-  const res = day ? await post("content/msessions", city, body(day), 30) : first;
-  const cinemas: CinemaShows[] = (res?.output?.movieCinemaSessions ?? []).map((cs: any) => {
+  const res = await timed("PVR INOX", on, async () => {
+    const first = await post("content/msessions", city, body("NA"), 60);
+    const days: string[] = (first?.output?.days ?? []).filter((d: any) => d.enable !== false).map((d: any) => String(d.dt));
+    const day = date && days.includes(date) ? date : days[0];
+    return { days, day, res: day ? await post("content/msessions", city, body(day), 30) : first };
+  }, (r) => r.res?.output?.movieCinemaSessions?.length ?? 0, { days: [] as string[], day: undefined as string | undefined, res: null as any });
+  const { days, day } = res;
+  const cinemas: CinemaShows[] = (res.res?.output?.movieCinemaSessions ?? []).map((cs: any) => {
     const lat = Number(cs.cinema?.latitude), lng = Number(cs.cinema?.longitude);
     const km = at && Number.isFinite(lat) && lat !== 0 ? Math.round(distanceKm(at, { lat, lng }) * 10) / 10 : undefined;
     const list: Show[] = [];
@@ -424,15 +448,16 @@ export async function shows(city: string, movieId: string, date: string | undefi
     list.sort((a, b) => a.hhmm.localeCompare(b.hhmm));
     return { name: String(cs.cinema?.name ?? "Cinema").replace(/,?\s*(Chennai)?\s*$/i, ""), address: cs.cinema?.address1 ?? "", km, shows: list, source: "pvrinox" as const };
   });
-  // Every other cinema for the same movie and date, from District.
-  if (districtUrl && day) {
-    const more = await districtShows(districtUrl, day, at).catch(() => []);
-    cinemas.push(...more);
-  }
-  // Chains read from their own websites (Miraj, MovieTime, Mukta A2, Mayajaal ...), unless already listed.
+  // Every other cinema for the same movie and date: District, and chains read from their own websites
+  // (Miraj, MovieTime, Mukta A2, Mayajaal ...), all at the same time. A cinema already listed is not repeated.
   if (day) {
     const title = (await movies(city).catch(() => [])).find((m) => m.id === movieId)?.title ?? "";
-    cinemas.push(...dedupe(cinemas, await chainShows(city, title, day, at)));
+    const [more, chains] = await Promise.all([
+      districtUrl ? timed("District", on, () => districtShows(districtUrl, day, at), (r) => r.length, [] as CinemaShows[]) : Promise.resolve([] as CinemaShows[]),
+      chainShows(city, title, day, at, on),
+    ]);
+    cinemas.push(...more);
+    cinemas.push(...dedupe(cinemas, chains));
   }
   cinemas.sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity));
   return { days, date: day, cinemas };

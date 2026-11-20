@@ -29,6 +29,18 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         cache = 300;
         break;
       case "shows":
+        if (q.stream) {
+          // Streamed: one line per site as it answers, then the result. The page shows who is slow.
+          res.writeHead(200, { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
+          const send = (x: unknown) => res.write(JSON.stringify(x) + "\n");
+          try {
+            send({ type: "done", result: await explore.shows(city, q.movie, q.date, at, q.dmovie, (p) => send({ type: "source", ...p })) });
+          } catch (e) {
+            send({ type: "error", message: (e as Error).message });
+          }
+          res.end();
+          return;
+        }
         body = await explore.shows(city, q.movie, q.date, at, q.dmovie);
         cache = 30;
         break;

@@ -7,6 +7,8 @@ import { miraj } from "./miraj.js";
 import { movietime, rajhans } from "./wemonde.js";
 import type { ChainCinema, ChainShow, ChainSource } from "./types.js";
 
+type OnProgress = (p: { name: string; state: "asking" | "done" | "failed"; ms?: number; cinemas?: number; note?: string }) => void;
+
 export const CHAINS: ChainSource[] = [miraj, movietime, rajhans, ...bmsWhiteLabelChains];
 
 const LIMIT_MS = 12_000;
@@ -39,19 +41,24 @@ export interface ChainCinemaShows {
 }
 
 /** Every chain cinema in the city showing this movie on this date. */
-export async function chainCinemas(city: string, title: string, date: string, at?: { lat: number; lng: number }): Promise<ChainCinemaShows[]> {
+export async function chainCinemas(city: string, title: string, date: string, at?: { lat: number; lng: number }, on?: OnProgress): Promise<ChainCinemaShows[]> {
   if (!title) return [];
   const chains = await chainsIn(city);
   const lists = await Promise.all(
     chains.map(async (chain) => {
+      const t = Date.now();
+      on?.({ name: chain.name, state: "asking" });
       try {
         const cinemas = await inTime(chain.shows(city, title, date));
+        on?.({ name: chain.name, state: "done", ms: Date.now() - t, cinemas: cinemas.filter((c) => c.shows.length).length });
         return cinemas.filter((c) => c.shows.length).map((cinema) => ({
           chain,
           cinema,
           km: at && cinema.lat !== undefined && cinema.lng !== undefined ? Math.round(distanceKm(at, { lat: cinema.lat, lng: cinema.lng }) * 10) / 10 : undefined,
         }));
-      } catch {
+      } catch (e) {
+        const slow = (e as Error).message === "took too long";
+        on?.({ name: chain.name, state: "failed", ms: Date.now() - t, note: slow ? `no answer in ${LIMIT_MS / 1000} s, skipped` : "its site did not answer" });
         return [];
       }
     }),
