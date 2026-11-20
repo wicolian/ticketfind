@@ -90,11 +90,12 @@ function App() {
     );
   }
 
-  async function watchShow(url: string, want: Want, label: string) {
+  async function watchShow(url: string, want: Want, label: string): Promise<string> {
     const { platform } = await api.inspect(url);
-    await api.create({ url, platform, want, everySec: 15 });
+    const w = await api.create({ url, platform, want, everySec: 15 });
     if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
     say(`Watching ${label}. We'll ping you when seats open.`);
+    return w.id;
   }
 
   useEffect(() => {

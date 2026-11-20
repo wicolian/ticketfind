@@ -13,8 +13,9 @@ function dayLabel(d: string) {
 
 function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch }: {
   city: string; date: string; show: Show; cinema: CinemaShows; group: number; skip: number; movie: Movie;
-  onWatch: (url: string, want: Want, label: string) => Promise<void>;
+  onWatch: (url: string, want: Want, label: string) => Promise<string>;
 }) {
+  const [watchId, setWatchId] = useState("");
   const [seats, setSeats] = useState<Seats | null>(null);
   const [watching, setWatching] = useState<"" | "busy" | "done">("");
   const shut = show.status === "closed" || show.status === "full";
@@ -34,8 +35,13 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch }: {
     await onWatch(movie.link, {
       seats: group, together: group > 1, skipFrontRows: skip, dates: [date], languages: show.language ? [show.language.toLowerCase()] : [],
       venues: [word.toLowerCase()], startAfter: show.hhmm, startBefore: next,
-    }, `${movie.title}, ${show.time} at ${word}`);
+    }, `${movie.title}, ${show.time} at ${word}`).then(setWatchId);
     setWatching("done");
+  }
+  async function stop() {
+    if (watchId) await api.remove(watchId);
+    setWatchId("");
+    setWatching("");
   }
 
   const good = seats?.ok && seats.best.length > 0;
@@ -63,7 +69,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch }: {
             <a className="btn btn-primary" href={show.bookUrl} target="_blank" rel="noreferrer">Book on PVR INOX <External size={14} /></a>
           ) : (
             watching === "done" ? (
-              <span className="done-note" role="status">Watching. We'll ping you when seats open.</span>
+              <span className="row"><span className="done-note" role="status">Watching. We'll ping you when seats open.</span><button className="btn btn-ghost btn-sm" onClick={stop}>Stop</button></span>
             ) : (
               <button className="btn btn-primary" onClick={watch} disabled={watching === "busy"}>
                 {watching === "busy" ? "Starting..." : "Ping me if seats open"}
@@ -71,7 +77,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch }: {
             )
           )}
           {good && (
-            watching === "done" ? <span className="done-note" role="status">Watching</span> : <button className="btn" onClick={watch} disabled={watching === "busy"}>Ping me if these go</button>
+            watching === "done" ? <span className="row"><span className="done-note" role="status">Watching</span><button className="btn btn-ghost btn-sm" onClick={stop}>Stop</button></span> : <button className="btn" onClick={watch} disabled={watching === "busy"}>Ping me if these go</button>
           )}
         </div>
       </div>
@@ -93,7 +99,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch }: {
 
 export function MoviePage({ city, movie, where, onBack, onWatch, onLocate }: {
   city: string; movie: Movie; where: Where; onBack: () => void; onLocate: () => void;
-  onWatch: (url: string, want: Want, label: string) => Promise<void>;
+  onWatch: (url: string, want: Want, label: string) => Promise<string>;
 }) {
   const [data, setData] = useState<{ days: string[]; date?: string; cinemas: CinemaShows[] } | null>(null);
   const [date, setDate] = useState<string | undefined>();
