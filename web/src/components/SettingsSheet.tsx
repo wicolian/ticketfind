@@ -11,6 +11,7 @@ function randomTopic(): string {
 export function SettingsSheet({ settings, onClose, onSaved }: { settings: PublicSettings; onClose: () => void; onSaved: (s: PublicSettings, msg: string) => void }) {
   const [ch, setCh] = useState(settings.channels);
   const [aiKey, setAiKey] = useState(settings.aiKey);
+  const [onTabClose, setOnTabClose] = useState(settings.onTabClose ?? "keep");
   const [busy, setBusy] = useState(false);
   const [testResult, setTestResult] = useState<string[] | null>(null);
 
@@ -25,7 +26,7 @@ export function SettingsSheet({ settings, onClose, onSaved }: { settings: Public
   async function save(andTest = false) {
     setBusy(true);
     try {
-      const s = await api.saveSettings({ channels: ch, aiKey });
+      const s = await api.saveSettings({ channels: ch, aiKey, onTabClose });
       if (andTest) {
         const r = await api.testPing();
         setTestResult(r.sent.length ? r.sent : ["No channels are on yet."]);
@@ -95,6 +96,19 @@ export function SettingsSheet({ settings, onClose, onSaved }: { settings: Public
               With an AI key you can type "2 seats together, not the front rows, before 7 pm" instead of filling fields. Use an Anthropic key, or an OpenRouter key (it uses Claude Haiku, about $0.0002 per request). The key stays on this computer.
             </p>
             <input className="input mono" type="password" placeholder="sk-ant-... or sk-or-..." value={aiKey} onChange={(e) => setAiKey(e.target.value)} autoComplete="off" />
+          </div>
+
+          <div className="channel">
+            <h4>When you close this tab</h4>
+            <label className="check" style={{ minHeight: 36 }}>
+              <input type="radio" name="tabclose" checked={onTabClose === "keep"} onChange={() => setOnTabClose("keep")} />
+              <span>Keep watching, and tell me it still is</span>
+            </label>
+            <label className="check" style={{ minHeight: 36 }}>
+              <input type="radio" name="tabclose" checked={onTabClose === "stop"} onChange={() => setOnTabClose("stop")} />
+              <span>Stop everything, and tell me it stopped</span>
+            </label>
+            <p className="hint" style={{ marginTop: 0 }}>A refresh doesn't count. ticketfind waits 15 seconds for the tab to come back.</p>
           </div>
 
           {testResult && (

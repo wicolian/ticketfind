@@ -36,6 +36,7 @@ function publicSettings() {
       telegramChatId: c.telegramChatId ?? "",
     },
     aiReady: Boolean(apiKey()),
+    onTabClose: s.onTabClose ?? "keep",
     aiKey: mask(s.anthropicApiKey),
   };
 }
@@ -48,7 +49,13 @@ export function buildApp(): Hono {
     return c.json({ error: human ? err.message : `Something broke: ${err.message}` }, human ? 400 : 500);
   });
 
+  app.get("/api/meta", (c) => c.json({ public: false, ai: Boolean(apiKey()) }));
   app.get("/api/state", (c) => c.json({ watches: engine.list(), settings: publicSettings() }));
+  // Sent by the page as it closes (navigator.sendBeacon). See engine.tabClosed.
+  app.post("/api/tab-closed", (c) => {
+    engine.tabClosed();
+    return c.body(null, 204);
+  });
 
   // Explore: browse a city, a movie's show times, and live seats for one show.
   app.get("/api/explore/cities", async (c) => {
@@ -118,7 +125,7 @@ export function buildApp(): Hono {
   });
 
   app.put("/api/settings", async (c) => {
-    const next = await c.req.json<{ channels: Record<string, unknown>; aiKey?: string }>();
+    const next = await c.req.json<{ channels: Record<string, unknown>; aiKey?: string; onTabClose?: "keep" | "stop" }>();
     const cur: Settings = store.settings();
     const channels = { ...cur.channels } as Record<string, unknown>;
     for (const [k, v] of Object.entries(next.channels ?? {})) {
@@ -127,7 +134,7 @@ export function buildApp(): Hono {
       channels[k] = typeof v === "string" ? v.trim() || undefined : v;
     }
     const aiKey = next.aiKey && !next.aiKey.startsWith("••••") ? next.aiKey.trim() || undefined : cur.anthropicApiKey;
-    store.saveSettings({ channels: channels as unknown as Settings["channels"], anthropicApiKey: next.aiKey === "" ? undefined : aiKey });
+    store.saveSettings({ channels: channels as unknown as Settings["channels"], anthropicApiKey: next.aiKey === "" ? undefined : aiKey, onTabClose: next.onTabClose === "stop" ? "stop" : "keep" });
     return c.json(publicSettings());
   });
 

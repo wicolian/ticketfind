@@ -19,11 +19,12 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build:web": "vite build --config web/vite.config.ts",
     "start": "node dist/server/cli.js",
-    "typecheck": "pnpm typecheck:server && pnpm typecheck:web",
+    "typecheck": "pnpm typecheck:server && pnpm typecheck:web && pnpm typecheck:api",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
     "typecheck:web": "tsc -p web/tsconfig.json --noEmit",
     "test": "vitest run",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "typecheck:api": "tsc -p tsconfig.api.json"
   },
   "keywords": [
     "tickets",

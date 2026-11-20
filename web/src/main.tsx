@@ -28,6 +28,8 @@ function chime() {
   }
 }
 
+const REPO = "https://github.com/wicolian/ticketfind";
+
 type Route = { page: "explore" } | { page: "movie"; id: string } | { page: "watching" };
 function readRoute(): Route {
   const h = location.hash.replace(/^#\/?/, "");
@@ -49,6 +51,10 @@ function App() {
   const [where, setWhere] = useState<{ lat: number; lng: number } | undefined>(() => store("tf.where", undefined));
   const [movie, setMovie] = useState<Movie | null>(null);
   const [locating, setLocating] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const [aiOn, setAiOn] = useState(false);
+  const isPublicRef = useRef(false);
+  useEffect(() => { isPublicRef.current = isPublic; }, [isPublic]);
   const [watches, setWatches] = useState<Watch[] | null>(null);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -66,7 +72,11 @@ function App() {
     const on = () => setRoute(readRoute());
     addEventListener("hashchange", on);
     api.cities().then((r) => setCities(r.cities)).catch(() => {});
-    return () => removeEventListener("hashchange", on);
+    api.meta().then((m) => { setIsPublic(m.public); setAiOn(m.ai); }).catch(() => {});
+    // Tell the local app the tab is closing (it decides, after 15 s, whether that was a refresh).
+    const bye = () => { if (!isPublicRef.current) navigator.sendBeacon?.("/api/tab-closed"); };
+    addEventListener("pagehide", bye);
+    return () => { removeEventListener("hashchange", on); removeEventListener("pagehide", bye); };
   }, []);
   const go = (h: string) => { location.hash = h; window.scrollTo(0, 0); };
 
@@ -145,14 +155,18 @@ function App() {
         <a className="brand" href="#/" onClick={(e) => { e.preventDefault(); go("/"); }}><span className="brand-mark"><Ticket size={16} /></span>ticketfind</a>
         <nav className="tabs-nav" aria-label="Main">
           <a href="#/" aria-current={route.page !== "watching" ? "page" : undefined} onClick={(e) => { e.preventDefault(); go("/"); }}>Explore</a>
-          <WatchingMenu watches={watches} current={route.page === "watching"} onOpenPage={() => go("/watching")} onToast={say} />
+          {!isPublic && <WatchingMenu watches={watches} current={route.page === "watching"} onOpenPage={() => go("/watching")} onToast={say} />}
         </nav>
         <div className="top-right">
           <select className="select city" aria-label="City" value={city} onChange={(e) => { setCity(e.target.value); keep("tf.city", e.target.value); }}>
             {(cities.length ? cities.map((c) => c.name) : [city]).map((n) => <option key={n}>{n}</option>)}
           </select>
           <button className="btn btn-ghost btn-sm" onClick={locate} disabled={locating} title="Use my location">{locating ? "Finding..." : where ? "Near me: on" : "Near me"}</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowSettings(true)} disabled={!settings} aria-label="Alerts"><Gear size={16} /></button>
+          {isPublic ? (
+            <a className="btn btn-sm" href={`${REPO}#start`} target="_blank" rel="noreferrer">Get alerts</a>
+          ) : (
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowSettings(true)} disabled={!settings} aria-label="Alerts"><Gear size={16} /></button>
+          )}
         </div>
       </header>
 
@@ -160,7 +174,7 @@ function App() {
         <ExplorePage city={city} onOpen={(m) => { setMovie(m); go(`/movie/${m.id}`); }} />
       ) : route.page === "movie" ? (
         movie ? (
-          <MoviePage city={city} movie={movie} where={where} onBack={() => go("/")} onLocate={locate} onWatch={watchShow} />
+          <MoviePage city={city} movie={movie} where={where} onBack={() => go("/")} onLocate={locate} onWatch={watchShow} publicMode={isPublic} aiOn={aiOn || !!settings?.aiReady} />
         ) : (
           <div className="card empty"><p className="muted">Loading the movie...</p></div>
         )
@@ -202,7 +216,13 @@ function App() {
         </>
       )}
 
-      <p className="footer">Runs on your computer. Never books or pays for you. Open source.</p>
+      <footer className="footer">
+        <p>{isPublic ? "Live seats from PVR INOX. Booking happens on their site. Get alerts with the free app." : "Runs on your computer. Never books or pays for you."}</p>
+        <p className="footer-links">
+          <a href={REPO} target="_blank" rel="noreferrer">Open source on GitHub</a>
+          <a href="https://www.linkedin.com/in/kelashik" target="_blank" rel="noreferrer">Made by Koushik</a>
+        </p>
+      </footer>
 
       {showSettings && settings && (
         <SettingsSheet settings={settings} onClose={() => setShowSettings(false)} onSaved={(s, msg) => { setSettings(s); say(msg); }} />

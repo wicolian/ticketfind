@@ -22,3 +22,6 @@ jobs:
       - name: Web UI (typecheck, build)
         if: hashFiles('web/src/**') != ''
         run: pnpm typecheck:web && pnpm build:web
+      - name: Website functions (typecheck)
+        if: hashFiles('api/*.ts') != ''
+        run: pnpm typecheck:api

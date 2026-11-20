@@ -56,6 +56,10 @@ Want another site? Adding one is a single file. See [docs/adapters.md](docs/adap
 - **Get around bot walls, captchas or logins.** If a site says no, the answer is no.
 - **Hammer a site.** Minimum gap between checks, jitter, and backoff on errors are built in.
 
+## Public website
+
+Explore and live seats also run as a website on Vercel. See [DEPLOY.md](DEPLOY.md). Environment variables: [.env.example](.env.example).
+
 ## Develop
 
 ```bash

@@ -14,6 +14,7 @@ const listeners = new Set<Listener>();
 let watches: Watch[] = store.watches();
 
 const LOG_CAP = 80;
+let tabTimer: NodeJS.Timeout | undefined;
 
 function now(): string {
   return new Date().toISOString();
@@ -125,7 +126,31 @@ export const engine = {
   },
   subscribe(l: Listener): () => void {
     listeners.add(l);
-    return () => listeners.delete(l);
+    clearTimeout(tabTimer); // a tab is open again (or was only refreshed)
+    return () => {
+      listeners.delete(l);
+      // The last tab went away, even if the browser never said goodbye (crash, lid closed, killed).
+      if (listeners.size === 0) this.tabClosed();
+    };
+  },
+  /**
+   * The last tab was closed. Wait 15 seconds so a refresh does not count, then either keep watching
+   * and say so, or stop everything, as the person chose in Alerts.
+   */
+  tabClosed(): void {
+    clearTimeout(tabTimer);
+    tabTimer = setTimeout(async () => {
+      if (listeners.size > 0) return;
+      const active = watches.filter((w) => w.status !== "paused");
+      if (!active.length) return;
+      const s = store.settings();
+      if (s.onTabClose === "stop") {
+        for (const w of [...watches]) this.remove(w.id);
+        await sendAlert(s.channels, { title: "ticketfind stopped", body: `You closed ticketfind, so it stopped all ${active.length} watches.`, url: "http://127.0.0.1:4848" });
+      } else {
+        await sendAlert(s.channels, { title: `Still watching ${active.length}`, body: "ticketfind keeps checking after you close the tab. Open it to stop, or press Ctrl+C in its terminal.", url: "http://127.0.0.1:4848" });
+      }
+    }, 15_000);
   },
   async create(input: { url: string; platform: Platform; want: Want; page?: PageMarkers; everySec?: number }): Promise<Watch> {
     // The same link with the same rules is already being watched: hand that one back instead of a twin.

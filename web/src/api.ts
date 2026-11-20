@@ -14,6 +14,7 @@ export interface PublicSettings {
   };
   aiReady: boolean;
   aiKey: string;
+  onTabClose: "keep" | "stop";
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -55,7 +56,10 @@ export const api = {
   checkNow: (id: string) => call<Watch>("POST", `/api/watches/${id}/check`),
   remove: (id: string) => call<{ ok: true }>("DELETE", `/api/watches/${id}`),
   bulk: (action: "stop" | "pause" | "resume", ids?: string[]) => call<{ done: number }>("POST", "/api/watches/bulk", { action, ids }),
-  saveSettings: (s: { channels: PublicSettings["channels"]; aiKey?: string }) => call<PublicSettings>("PUT", "/api/settings", s),
+  meta: () => call<{ public: boolean; ai: boolean }>("GET", "/api/meta"),
+  understandShow: (text: string, title: string, url: string) =>
+    call<{ want: Want }>("POST", "/api/understand", { text, title, url, platform: { id: "pvr-inox", name: "PVR INOX", depth: "seats", meta: {}, title } }),
+  saveSettings: (s: { channels: PublicSettings["channels"]; aiKey?: string; onTabClose?: "keep" | "stop" }) => call<PublicSettings>("PUT", "/api/settings", s),
   testPing: () => call<{ sent: string[] }>("POST", "/api/test-ping"),
 };
 
