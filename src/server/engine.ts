@@ -44,9 +44,25 @@ function alertFor(w: Watch, ms: Match[]) {
   };
 }
 
+/** Every date the watch asked for is already in the past. */
+function datesPassed(w: Watch): boolean {
+  if (!w.want.dates.length) return false;
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return w.want.dates.every((x) => x < today);
+}
+
 export async function checkNow(id: string): Promise<Watch | undefined> {
   const w = watches.find((x) => x.id === id);
   if (!w || running.has(id)) return w;
+  if (datesPassed(w)) {
+    if (w.status !== "paused") {
+      w.status = "paused";
+      addLog(w, "check", "Paused: the dates you picked have passed.");
+      persist(w);
+    }
+    return w;
+  }
   running.add(id);
   const before = signature(w.last?.matches ?? []);
   try {
@@ -112,6 +128,12 @@ export const engine = {
     return () => listeners.delete(l);
   },
   async create(input: { url: string; platform: Platform; want: Want; page?: PageMarkers; everySec?: number }): Promise<Watch> {
+    // The same link with the same rules is already being watched: hand that one back instead of a twin.
+    const same = watches.find((x) => x.url === input.url && JSON.stringify(x.want) === JSON.stringify(input.want) && JSON.stringify(x.page ?? {}) === JSON.stringify(input.page ?? {}));
+    if (same) {
+      if (same.status === "paused") this.update(same.id, { status: "watching" });
+      return same;
+    }
     const w: Watch = {
       id: randomUUID().slice(0, 8),
       url: input.url,
