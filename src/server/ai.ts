@@ -83,7 +83,7 @@ export async function understandWant(apiKey: string, text: string, platform: Pla
   const system =
     "You turn a person's ticket wish into watch rules. Only set a rule the person stated or clearly implied. " +
     "Resolve relative dates against today's date. Dates are never in the past: \"the 17th\" means the next 17th on or after today. " +
-    "Times are local to the venue.";
+    "Times are local to the venue. venues are only cinema names the person named; never the chain or site name (PVR, INOX, District).";
   const user = `Today is ${today}. They are watching: ${platform.title} on ${platform.name}.\nTheir wish: ${text}`;
   let w: z.infer<typeof WantSchema> | null;
   if (isOpenRouter(apiKey)) {
