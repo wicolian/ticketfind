@@ -6,7 +6,8 @@ import { MoviePage } from "./explore/MoviePage";
 import { NewWatch } from "./components/NewWatch";
 import { SettingsSheet } from "./components/SettingsSheet";
 import { WatchCard } from "./components/WatchCard";
-import { BulkActions, WatchingMenu } from "./components/WatchingMenu";
+import { BulkActions, WatchingMenu, serverActions, type WatchActions } from "./components/WatchingMenu";
+import { asWatch, useBrowserWatches } from "./browserWatch";
 import { Bell, Pin, Settings as Gear, Ticket } from "./icons";
 import "./styles.css";
 
@@ -55,6 +56,9 @@ function App() {
   const [aiOn, setAiOn] = useState(false);
   const isPublicRef = useRef(false);
   useEffect(() => { isPublicRef.current = isPublic; }, [isPublic]);
+  const browser = useBrowserWatches(isPublic, (w) => { chime(); say(`Seats open: ${w.matches[0]?.when}, ${w.matches[0]?.venue}`); });
+  const browserActions: WatchActions = { remove: browser.remove, bulk: browser.bulk, checkNow: browser.checkNow, setStatus: browser.setStatus };
+  const actions = isPublic ? browserActions : serverActions;
   const [watches, setWatches] = useState<Watch[] | null>(null);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -102,6 +106,13 @@ function App() {
   }
 
   async function watchShow(url: string, want: Want, label: string): Promise<string> {
+    if (isPublic) {
+      if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission().catch(() => {});
+      const blocked = "Notification" in window && Notification.permission === "denied";
+      const id = browser.add({ title: `${movie?.title ?? "Movie"} in ${city}`, label, city, movieId: movie?.id ?? "", districtUrl: movie?.districtUrl, link: url, want });
+      say(blocked ? `Watching ${label}. Notifications are blocked in this browser, so keep this tab in view.` : `Watching ${label}. Keep this tab open: we'll notify you here.`);
+      return id;
+    }
     const { platform } = await api.inspect(url);
     const w = await api.create({ url, platform, want, everySec: 15 });
     if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
@@ -142,7 +153,8 @@ function App() {
     return () => { es.close(); window.clearInterval(t); };
   }, []);
 
-  const found = (watches ?? []).filter((w) => w.status === "found").length;
+  const shown: Watch[] | null = isPublic ? browser.list.map(asWatch) : watches;
+  const found = (shown ?? []).filter((w) => w.status === "found").length;
   useEffect(() => {
     document.title = found ? `(${found}) Seats open, ticketfind` : "ticketfind";
   }, [found]);
@@ -155,7 +167,7 @@ function App() {
         <a className="brand" href="#/" onClick={(e) => { e.preventDefault(); go("/"); }}><span className="brand-mark"><Ticket size={16} /></span>ticketfind</a>
         <nav className="tabs-nav" aria-label="Main">
           <a href="#/" aria-current={route.page !== "watching" ? "page" : undefined} onClick={(e) => { e.preventDefault(); go("/"); }}>Explore</a>
-          {!isPublic && <WatchingMenu watches={watches} current={route.page === "watching"} onOpenPage={() => go("/watching")} onToast={say} />}
+          <WatchingMenu watches={shown} current={route.page === "watching"} onOpenPage={() => go("/watching")} onToast={say} actions={actions} />
         </nav>
         <div className="top-right">
           <select className="select city" aria-label="City" value={city} onChange={(e) => { setCity(e.target.value); keep("tf.city", e.target.value); }}>
@@ -171,7 +183,7 @@ function App() {
             <Pin size={15} /> {locating ? "Finding you..." : where ? "Near you" : "Near me"}
           </button>
           {isPublic ? (
-            <a className="btn btn-sm" href={`${REPO}#start`} target="_blank" rel="noreferrer">Get alerts</a>
+            <a className="btn btn-ghost btn-sm" href={`${REPO}#start`} target="_blank" rel="noreferrer" title="Optional: alerts with the browser closed, and on your phone">Desktop app</a>
           ) : (
             <button className="btn btn-ghost btn-sm" onClick={() => setShowSettings(true)} disabled={!settings} aria-label="Alerts"><Gear size={16} /></button>
           )}
@@ -182,10 +194,43 @@ function App() {
         <ExplorePage city={city} onOpen={(m) => { setMovie(m); go(`/movie/${m.id}`); }} />
       ) : route.page === "movie" ? (
         movie ? (
-          <MoviePage city={city} movie={movie} where={where} onBack={() => go("/")} onLocate={locate} onWatch={watchShow} publicMode={isPublic} aiOn={aiOn || !!settings?.aiReady} />
+          <MoviePage city={city} movie={movie} where={where} onBack={() => go("/")} onLocate={locate} onWatch={watchShow} onStop={(id) => actions.remove(id)} aiOn={aiOn || !!settings?.aiReady} />
         ) : (
           <div className="card empty"><p className="muted">Loading the movie...</p></div>
         )
+      ) : isPublic ? (
+        <>
+          <div className="explore-head">
+            <h1 className="page-title">Watching</h1>
+            <p className="muted" style={{ margin: 0 }}>Shows this browser checks for you every minute. Keep this tab open, even in the background, and you'll get a notification here when seats open.</p>
+          </div>
+          {"Notification" in window && Notification.permission !== "granted" && (
+            <div className="callout callout-warn" style={{ marginBottom: 16 }}>
+              <Bell />
+              <div className="spread" style={{ flex: 1, flexWrap: "wrap" }}>
+                <span style={{ flex: "1 1 280px" }}>{Notification.permission === "denied" ? "Notifications are blocked for this site. Allow them in the browser's site settings, or keep this tab in view." : "Allow notifications so you hear about seats while you're in another tab."}</span>
+                {Notification.permission === "default" && <button className="btn btn-sm" onClick={() => Notification.requestPermission().then(() => tick((n) => n + 1))}>Allow notifications</button>}
+              </div>
+            </div>
+          )}
+          <div className="section-title">
+            <h2>{browser.list.length ? `${browser.list.length} watching` : "Watching"}</h2>
+            {browser.list.length > 0 && <BulkActions watches={shown ?? []} onToast={say} actions={actions} />}
+          </div>
+          {browser.list.length === 0 ? (
+            <div className="card empty">
+              <div className="empty-art"><Bell size={22} /></div>
+              <h3>Nothing watched yet</h3>
+              <p>Open a movie, tap a show time, then "Ping me if seats open". Or use "Ping me for any show that fits" to cover every show at once.</p>
+              <button className="btn" style={{ marginTop: 12 }} onClick={() => go("/")}>Browse movies</button>
+            </div>
+          ) : (
+            [...(shown ?? [])]
+              .sort((a, b) => Number(b.status === "found") - Number(a.status === "found"))
+              .map((w) => <WatchCard key={w.id} w={w} onToast={say} actions={actions} />)
+          )}
+          <p className="hint" style={{ marginTop: 16 }}>Want alerts with the browser closed, or on your phone? Install the optional <a href={`${REPO}#start`} target="_blank" rel="noreferrer">ticketfind app</a>.</p>
+        </>
       ) : loadError ? (
         <div className="callout callout-danger" role="alert">{loadError}</div>
       ) : (

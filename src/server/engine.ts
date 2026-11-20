@@ -14,6 +14,17 @@ const listeners = new Set<Listener>();
 let watches: Watch[] = store.watches();
 
 const LOG_CAP = 80;
+/** A show must stay truly sold out this long, with the site answering, before ticketfind gives up. */
+const GIVE_UP_AFTER_MS = 30 * 60_000;
+
+/** For a watch on one exact show: the moment that show starts. */
+function showStart(w: Watch): number | undefined {
+  const { startAfter, startBefore, dates } = w.want;
+  if (!startAfter || !startBefore || dates.length !== 1) return undefined;
+  const [a, b] = [startAfter, startBefore].map((t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; });
+  if (b - a > 1) return undefined;
+  return new Date(`${dates[0]}T${startAfter}:00`).getTime();
+}
 let tabTimer: NodeJS.Timeout | undefined;
 
 function now(): string {
@@ -56,6 +67,14 @@ function datesPassed(w: Watch): boolean {
 export async function checkNow(id: string): Promise<Watch | undefined> {
   const w = watches.find((x) => x.id === id);
   if (!w || running.has(id)) return w;
+  const starts = showStart(w);
+  if (starts && Date.now() > starts && w.status !== "paused") {
+    w.status = "paused";
+    w.ended = "The show has started, so ticketfind stopped watching it.";
+    addLog(w, "check", w.ended);
+    persist(w);
+    return w;
+  }
   if (datesPassed(w)) {
     if (w.status !== "paused") {
       w.status = "paused";
@@ -70,8 +89,21 @@ export async function checkNow(id: string): Promise<Watch | undefined> {
     const result = await adapterFor(w.platform.id).check(w);
     failures.delete(id);
     w.last = result;
-    w.lastError = undefined;
+    w.lastError = result.state === "down" ? "The cinema's site isn't answering. ticketfind keeps trying." : undefined;
     w.lastCheckAt = now();
+    if (result.state === "down" && w.log[0]?.kind !== "error") addLog(w, "error", "The cinema's site is down. ticketfind keeps trying.");
+    if (result.state === "soldout") {
+      w.soldOutSince ??= now();
+      if (Date.now() - new Date(w.soldOutSince).getTime() >= GIVE_UP_AFTER_MS) {
+        w.status = "paused";
+        w.ended = "Gave up: every show you picked stayed truly sold out for 30 minutes, with the site answering.";
+        addLog(w, "check", w.ended);
+        const sent = await sendAlert(store.settings().channels, { title: "ticketfind gave up", body: `${w.platform.title}: truly sold out for 30 minutes. Resume it any time.`, url: w.url });
+        if (sent.length) addLog(w, "notify", sent.join(", "));
+        failures.delete(id);
+        return w;
+      }
+    } else if (result.state !== "down") w.soldOutSince = undefined;
     const after = signature(result.matches);
     if (result.matches.length && after !== before) {
       w.status = "found";
@@ -85,14 +117,15 @@ export async function checkNow(id: string): Promise<Watch | undefined> {
     } else if (!result.matches.length) {
       w.status = "watching";
       // Keep the log readable: only note a check when the summary changes.
-      if (w.log[0]?.kind !== "check" || w.log[0].text !== result.summary) addLog(w, "check", result.summary);
+      const note = result.state === "soldout" ? `${result.summary} Sold out right now. Still watching: seats often come back.` : result.summary;
+      if (w.log[0]?.kind !== "check" || w.log[0].text !== note) addLog(w, "check", note);
     }
   } catch (e) {
     const n = (failures.get(id) ?? 0) + 1;
     failures.set(id, n);
-    w.lastError = (e as Error).message;
+    w.lastError = `The site isn't answering (${(e as Error).message}). ticketfind keeps trying.`;
     w.lastCheckAt = now();
-    if (n === 1 || n % 10 === 0) addLog(w, "error", `The site did not answer: ${w.lastError}. Trying again.`);
+    if (n === 1 || n % 10 === 0) addLog(w, "error", w.lastError);
   } finally {
     running.delete(id);
     persist(w);
@@ -180,6 +213,7 @@ export const engine = {
     const w = watches.find((x) => x.id === id);
     if (!w) return undefined;
     Object.assign(w, patch);
+    if (patch.status === "watching") { w.ended = undefined; w.soldOutSince = undefined; }
     if (patch.status) addLog(w, "check", patch.status === "paused" ? "Paused." : "Watching again.");
     persist(w);
     schedule(w);

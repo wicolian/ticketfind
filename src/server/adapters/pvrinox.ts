@@ -105,6 +105,7 @@ export const pvrInox: Adapter = {
     const matches: Match[] = [];
     let looked = 0;
     let troubled = 0;
+    let soldOut = 0;
 
     for (const date of dates) {
       const res = await sessions(city, movieId, date);
@@ -117,7 +118,8 @@ export const pvrInox: Adapter = {
             if (!showFits({ date, time: show.showTime, language: show.language, venue }, watch.want)) continue;
             looked++;
             const status = String(show.statusTxt ?? "");
-            if (/lapsed|housefull/i.test(status)) continue;
+            if (/housefull|sold/i.test(status)) { soldOut++; continue; }
+            if (/lapsed/i.test(status)) continue; // not on sale right now (often during an outage): keep trying
             const layout = await post("ticketing/seatlayout", city, {
               dated: date,
               encrypted: show.encrypted,
@@ -126,7 +128,8 @@ export const pvrInox: Adapter = {
             });
             const out = layout?.output;
             if (!out?.rows) {
-              troubled++;
+              // "trouble connecting to cinema" and friends mean the site is down, not that seats are gone.
+              if (/trouble|connect|facing|try again|timeout|went wrong/i.test(String(layout?.msg ?? ""))) troubled++;
               continue;
             }
             const rows: Row[] = out.rows
@@ -139,6 +142,7 @@ export const pvrInox: Adapter = {
                   .map((s: any) => ({ label: s.label, pos: s.pos, free: s.st === 1 })),
               }));
             const pick = pickSeats(rows, watch.want);
+            if (!rows.some((r) => r.seats.some((x) => x.free))) soldOut++;
             if (pick.seats.length) {
               matches.push({
                 when: niceWhen(date, show.showTime),
@@ -160,6 +164,7 @@ export const pvrInox: Adapter = {
         : matches.length
           ? `${matches.length} of ${looked} shows have seats for you.`
           : `Checked ${looked} shows. None have seats that fit yet.${troubled ? ` ${troubled} could not reach the cinema.` : ""}`;
-    return { matches: nearestFirst(matches), summary, troubled };
+    const state = matches.length ? "open" : troubled ? "down" : looked > 0 && soldOut === looked ? "soldout" : "waiting";
+    return { matches: nearestFirst(matches), summary, troubled, state };
   },
 };

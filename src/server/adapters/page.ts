@@ -58,7 +58,7 @@ export const page: Adapter = {
 
   async check(watch: Watch): Promise<CheckResult> {
     const { status, text, title } = await fetchPage(watch.url);
-    if (status >= 500) return { matches: [], summary: `The site is down right now (HTTP ${status}).`, troubled: 1 };
+    if (status >= 500) return { matches: [], summary: `The site is down right now (HTTP ${status}). Still trying.`, troubled: 1, state: "down" };
     const key = jevKey();
     if (key && !watch.page?.openText && !watch.page?.closedText) {
       const a = await askSaleState(key, { title, url: watch.url, text }, "");
@@ -70,7 +70,7 @@ export const page: Adapter = {
             summary: `Jev read the page: tickets are on sale (${pct}% sure).`,
             troubled: 0,
           }
-        : { matches: [], summary: `Jev read the page: ${SALE_WORDS[a.state]} (${pct}% sure).`, troubled: 0 };
+        : { matches: [], summary: `Jev read the page: ${SALE_WORDS[a.state]} (${pct}% sure).`, troubled: 0, state: a.state === "sold_out" && a.confidence >= OPEN_AT ? "soldout" : "waiting" };
     }
     const lower = text.toLowerCase();
     const open = watch.page?.openText?.toLowerCase();

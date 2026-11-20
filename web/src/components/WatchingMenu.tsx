@@ -1,11 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { api, describeWant, type Watch } from "../api";
+
+export interface WatchActions {
+  remove: (id: string) => unknown;
+  bulk: (action: "stop" | "pause" | "resume") => unknown;
+  checkNow?: (id: string) => unknown;
+  setStatus?: (id: string, status: "watching" | "paused") => unknown;
+}
+export const serverActions: WatchActions = {
+  remove: (id) => api.remove(id),
+  bulk: (a) => api.bulk(a),
+  checkNow: (id) => api.checkNow(id),
+  setStatus: (id, status) => api.update(id, { status }),
+};
 import { Chevron } from "../icons";
 
 function statusOf(w: Watch): { label: string; cls: string } {
+  if (w.ended) return { label: "Gave up", cls: "pill-paused" };
   if (w.status === "paused") return { label: "Paused", cls: "pill-paused" };
   if (w.status === "found") return { label: "Seats open", cls: "pill-found" };
-  if (w.lastError) return { label: "Site trouble", cls: "pill-trouble" };
+  if (w.lastError) return { label: "Site down, still trying", cls: "pill-trouble" };
+  if (w.last?.state === "soldout") return { label: "Sold out, still watching", cls: "pill-watching" };
   return { label: "Watching", cls: "pill-watching" };
 }
 
@@ -13,11 +28,14 @@ function statusOf(w: Watch): { label: string; cls: string } {
 function lineFor(w: Watch): string {
   const m = w.status === "found" ? w.last?.matches[0] : undefined;
   if (m) return `${m.when}, ${m.venue}${m.seats.length ? `, ${m.seats.join(" + ")}` : ""}`;
+  if (w.ended) return w.ended;
+  if (w.lastError) return "Site down, still trying";
+  if (w.last?.state === "soldout") return "Sold out right now, still watching";
   return describeWant(w.want);
 }
 
 /** Pause all / Resume all / Stop all, with one confirm step before stopping. */
-export function BulkActions({ watches, onToast, compact = false }: { watches: Watch[]; onToast: (t: string) => void; compact?: boolean }) {
+export function BulkActions({ watches, onToast, compact = false, actions = serverActions }: { watches: Watch[]; onToast: (t: string) => void; compact?: boolean; actions?: WatchActions }) {
   const [confirm, setConfirm] = useState(false);
   const allPaused = watches.length > 0 && watches.every((w) => w.status === "paused");
   const n = watches.length;
@@ -27,7 +45,7 @@ export function BulkActions({ watches, onToast, compact = false }: { watches: Wa
       <button
         className="btn btn-ghost btn-sm"
         onClick={async () => {
-          await api.bulk(allPaused ? "resume" : "pause");
+          await actions.bulk(allPaused ? "resume" : "pause");
           onToast(allPaused ? `Watching all ${n} again.` : `Paused all ${n}.`);
         }}
       >
@@ -39,7 +57,7 @@ export function BulkActions({ watches, onToast, compact = false }: { watches: Wa
           autoFocus
           onBlur={() => setConfirm(false)}
           onClick={async () => {
-            await api.bulk("stop");
+            await actions.bulk("stop");
             setConfirm(false);
             onToast(`Stopped all ${n}.`);
           }}
@@ -53,8 +71,8 @@ export function BulkActions({ watches, onToast, compact = false }: { watches: Wa
   );
 }
 
-export function WatchingMenu({ watches, current, onOpenPage, onToast }: {
-  watches: Watch[] | null; current: boolean; onOpenPage: () => void; onToast: (t: string) => void;
+export function WatchingMenu({ watches, current, onOpenPage, onToast, actions = serverActions }: {
+  watches: Watch[] | null; current: boolean; onOpenPage: () => void; onToast: (t: string) => void; actions?: WatchActions;
 }) {
   const [open, setOpen] = useState(false);
   const [confirmId, setConfirmId] = useState("");
@@ -108,7 +126,7 @@ export function WatchingMenu({ watches, current, onOpenPage, onToast }: {
                       <div className="row" style={{ flexWrap: "nowrap" }}>
                         {top && <a className="btn btn-primary btn-sm" href={top.bookUrl} target="_blank" rel="noreferrer">Book</a>}
                         {confirmId === w.id ? (
-                          <button className="btn btn-sm btn-danger" autoFocus onBlur={() => setConfirmId("")} onClick={async () => { await api.remove(w.id); setConfirmId(""); onToast("Stopped watching."); }}>
+                          <button className="btn btn-sm btn-danger" autoFocus onBlur={() => setConfirmId("")} onClick={async () => { await actions.remove(w.id); setConfirmId(""); onToast("Stopped watching."); }}>
                             Stop?
                           </button>
                         ) : (
@@ -122,7 +140,7 @@ export function WatchingMenu({ watches, current, onOpenPage, onToast }: {
             </ul>
           )}
           <div className="wmenu-foot">
-            <BulkActions watches={list} onToast={onToast} compact />
+            <BulkActions watches={list} onToast={onToast} compact actions={actions} />
             <button className="btn btn-sm" onClick={() => { setOpen(false); onOpenPage(); }}>See all</button>
           </div>
         </div>
