@@ -9,3 +9,6 @@ dist
 *.env
 .ticketfind/
 settings.json
+.vercel
+.env*
+!.env.example

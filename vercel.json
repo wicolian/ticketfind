@@ -35,5 +35,8 @@
     "api/explore.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "regions": [
+    "bom1"
+  ]
 }
