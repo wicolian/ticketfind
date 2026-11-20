@@ -41,6 +41,7 @@ Add an AI key under **Alerts**, either a [Claude API key](https://console.anthro
 | **PVR INOX** (inoxmovies.com, pvrcinemas.com) | Exact seats. Picks the best block for you. | The page that lists every show time (has `/moviesessions/` in it) |
 | **District** (district.in) | Free-seat count per show. Counts can lag a little. | The movie page that lists every cinema (ends in `-MV` and a number) |
 | **Concerts and events** (District events, Eventbrite, Skiddle, Dice, venue sites...) | Watches the event page for words like "Sold out", "Coming soon" or "Book tickets". Add a Claude key and it picks the words for you. | The event page you'd keep refreshing |
+| **With a Jev key** ([TypeSafe](https://typesafe.ai)) | Jev reads concert and event pages and says when tickets can be bought: on sale, sold out, not yet, or unclear. ticketfind pings you only when Jev is at least 70% sure it is on sale. No words to pick. | Add the key under **Alerts** |
 | **Any other page** (buses, sports, plays...) | Same: watches the page for the words that mean "on sale". | The page you'd keep refreshing |
 | **BookMyShow** | Can't watch. It blocks automated checks. For PVR INOX cinemas, use inoxmovies.com or District: same seats. | |
 | **Ticketmaster, AXS and other sites behind a queue or bot wall** | If the page blocks automated checks, ticketfind says so instead of trying to get around it. | |

@@ -1,6 +1,16 @@
 // Any other site: load the page and look for words that mean "on sale" or "sold out".
 import type { CheckResult, Platform, Watch } from "../types.js";
 import { type Adapter, BROWSER_UA, UserError } from "./types.js";
+import { askSaleState } from "../jev.js";
+import { store } from "../store.js";
+
+/** Jev reads the page when a TypeSafe key is set and no words were given. */
+export function jevKey(): string | undefined {
+  return store.settings().typesafeApiKey || process.env.TYPESAFE_API_KEY || undefined;
+}
+
+const SALE_WORDS = { on_sale: "on sale", sold_out: "sold out", not_yet: "not on sale yet", unclear: "not saying" } as const;
+const OPEN_AT = 0.7; // Jev must be at least this sure before ticketfind pings you
 
 /** Visible text of an HTML page, lower case, whitespace squashed. */
 export function pageText(html: string): string {
@@ -47,8 +57,21 @@ export const page: Adapter = {
   },
 
   async check(watch: Watch): Promise<CheckResult> {
-    const { status, text } = await fetchPage(watch.url);
+    const { status, text, title } = await fetchPage(watch.url);
     if (status >= 500) return { matches: [], summary: `The site is down right now (HTTP ${status}).`, troubled: 1 };
+    const key = jevKey();
+    if (key && !watch.page?.openText && !watch.page?.closedText) {
+      const a = await askSaleState(key, { title, url: watch.url, text }, "");
+      const open = a.state === "on_sale" && a.confidence >= OPEN_AT;
+      const pct = Math.round(a.confidence * 100);
+      return open
+        ? {
+            matches: [{ when: "Now", venue: new URL(watch.url).hostname.replace(/^www\./, ""), seats: [], free: 0, bookUrl: watch.url }],
+            summary: `Jev read the page: tickets are on sale (${pct}% sure).`,
+            troubled: 0,
+          }
+        : { matches: [], summary: `Jev read the page: ${SALE_WORDS[a.state]} (${pct}% sure).`, troubled: 0 };
+    }
     const lower = text.toLowerCase();
     const open = watch.page?.openText?.toLowerCase();
     const closed = watch.page?.closedText?.toLowerCase();

@@ -12,6 +12,7 @@ export function SettingsSheet({ settings, onClose, onSaved }: { settings: Public
   const [ch, setCh] = useState(settings.channels);
   const [aiKey, setAiKey] = useState(settings.aiKey);
   const [onTabClose, setOnTabClose] = useState(settings.onTabClose ?? "keep");
+  const [jevKey, setJevKey] = useState(settings.jevKey ?? "");
   const [busy, setBusy] = useState(false);
   const [testResult, setTestResult] = useState<string[] | null>(null);
 
@@ -26,7 +27,7 @@ export function SettingsSheet({ settings, onClose, onSaved }: { settings: Public
   async function save(andTest = false) {
     setBusy(true);
     try {
-      const s = await api.saveSettings({ channels: ch, aiKey, onTabClose });
+      const s = await api.saveSettings({ channels: ch, aiKey, jevKey, onTabClose });
       if (andTest) {
         const r = await api.testPing();
         setTestResult(r.sent.length ? r.sent : ["No channels are on yet."]);
@@ -96,6 +97,14 @@ export function SettingsSheet({ settings, onClose, onSaved }: { settings: Public
               With an AI key you can type "2 seats together, not the front rows, before 7 pm" instead of filling fields. Use an Anthropic key, or an OpenRouter key (it uses Claude Haiku, about $0.0002 per request). The key stays on this computer.
             </p>
             <input className="input mono" type="password" placeholder="sk-ant-... or sk-or-..." value={aiKey} onChange={(e) => setAiKey(e.target.value)} autoComplete="off" />
+          </div>
+
+          <div className="channel">
+            <h4>Jev reads event pages (optional)</h4>
+            <p className="hint" style={{ marginTop: 0 }}>
+              With a <a href="https://typesafe.ai" target="_blank" rel="noreferrer">TypeSafe</a> key, Jev reads concert and event pages and tells ticketfind when tickets go on sale, so you don't have to pick the words. The key stays on this computer.
+            </p>
+            <input className="input mono" type="password" placeholder="apikey_..." value={jevKey} onChange={(e) => setJevKey(e.target.value)} autoComplete="off" />
           </div>
 
           <div className="channel">
