@@ -100,7 +100,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
         </div>
         <div className="row">
           {good ? (
-            <a className="btn btn-primary" href={show.bookUrl} target="_blank" rel="noreferrer">{fromDistrict ? "Book on District" : "Book on PVR INOX"} <External size={14} /></a>
+            <a className="btn btn-primary" href={show.bookUrl} target="_blank" rel="noreferrer">{fromDistrict ? "Book on District" : show.source === "chain" ? `Book on ${cinema.chain ?? "the cinema's site"}` : "Book on PVR INOX"} <External size={14} /></a>
           ) : (
             watching === "done" ? (
               <span className="row"><span className="done-note" role="status">Watching. We'll ping you when seats open.</span><button className="btn btn-ghost btn-sm" onClick={stop}>Stop</button></span>
@@ -355,7 +355,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
                 <div className="spread">
                   <h3>{c.name}</h3>
                   <span className="row" style={{ gap: 10, flexWrap: "nowrap" }}>
-                    <span className="src-tag" title={c.source === "district" ? "Seats and booking on District" : "Seats and booking on PVR INOX"}>{c.source === "district" ? "Books on District" : "Books on PVR INOX"}</span>
+                    <span className="src-tag" title={`Seats and booking on ${c.source === "district" ? "District" : c.source === "chain" ? `${c.chain}'s own site` : "PVR INOX"}`}>Books on {c.source === "district" ? "District" : c.source === "chain" ? c.chain : "PVR INOX"}</span>
                     {c.km !== undefined && <span className="faint mono">{c.km} km</span>}
                   </span>
                 </div>
@@ -369,7 +369,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
                       onClick={() => setPicked(picked?.ref === s.ref ? null : { cinema: c.name, ref: s.ref })}
                     >
                       <b>{s.time.replace(/^0/, "")}</b>
-                      <span>{s.status === "full" ? "Sold out" : s.source === "district" ? `${s.free} free` : s.screen && s.screen !== "Premium" ? s.screen : s.language}</span>
+                      <span>{s.status === "full" ? "Sold out" : s.source !== "pvrinox" && s.free !== undefined ? `${s.free} free` : s.screen && s.screen !== "Premium" ? s.screen : s.language}</span>
                       {s.priceFrom !== undefined && s.status !== "full" && <span className="chip-price">from {rupees(s.priceFrom)}</span>}
                     </button>
                   ))}

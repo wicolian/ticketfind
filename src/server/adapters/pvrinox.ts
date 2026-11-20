@@ -3,6 +3,7 @@
 import type { CheckResult, Match, Platform, Watch } from "../types.js";
 import { nearestFirst, niceWhen, pickSeats, showFits, venueDistance, type Row } from "../rules.js";
 import { type Adapter, BROWSER_UA, nextDays, UserError } from "./types.js";
+import { chainMatches } from "../chains/index.js";
 
 const API = "https://api3.inoxmovies.com/api/v1/booking/";
 
@@ -157,6 +158,14 @@ export const pvrInox: Adapter = {
         }
       }
     }
+
+    // The same movie at chains PVR INOX does not sell (Miraj, MovieTime, Mukta A2, Mayajaal ...).
+    const title = String(watch.platform.title ?? "").replace(/\s+in\s+[^]+$/, "");
+    const more = await chainMatches(city, title, dates, watch.want).catch(() => ({ matches: [], looked: 0, soldOut: 0, down: 0 }));
+    matches.push(...more.matches);
+    looked += more.looked;
+    soldOut += more.soldOut;
+    troubled += more.down;
 
     const summary =
       looked === 0
