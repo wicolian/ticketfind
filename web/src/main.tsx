@@ -7,7 +7,7 @@ import { NewWatch } from "./components/NewWatch";
 import { SettingsSheet } from "./components/SettingsSheet";
 import { WatchCard } from "./components/WatchCard";
 import { BulkActions, WatchingMenu } from "./components/WatchingMenu";
-import { Bell, Settings as Gear, Ticket } from "./icons";
+import { Bell, Pin, Settings as Gear, Ticket } from "./icons";
 import "./styles.css";
 
 function chime() {
@@ -161,7 +161,15 @@ function App() {
           <select className="select city" aria-label="City" value={city} onChange={(e) => { setCity(e.target.value); keep("tf.city", e.target.value); }}>
             {(cities.length ? cities.map((c) => c.name) : [city]).map((n) => <option key={n}>{n}</option>)}
           </select>
-          <button className="btn btn-ghost btn-sm" onClick={locate} disabled={locating} title="Use my location">{locating ? "Finding..." : where ? "Near me: on" : "Near me"}</button>
+          <button
+            className="btn btn-ghost btn-sm near-toggle"
+            aria-pressed={!!where}
+            disabled={locating}
+            title={where ? "Cinemas are sorted by distance from you. Click to turn off." : "Sort cinemas by distance from you"}
+            onClick={() => { if (where) { setWhere(undefined); keep("tf.where", undefined); say("Location off. Cinemas in the site's order."); } else locate(); }}
+          >
+            <Pin size={15} /> {locating ? "Finding you..." : where ? "Near you" : "Near me"}
+          </button>
           {isPublic ? (
             <a className="btn btn-sm" href={`${REPO}#start`} target="_blank" rel="noreferrer">Get alerts</a>
           ) : (
