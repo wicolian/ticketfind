@@ -1,0 +1,24 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request: # every base branch, so each layer of a stacked PR gets checks
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Server (typecheck, test, build)
+        if: hashFiles('src/server/**/*.ts') != ''
+        run: pnpm typecheck:server && pnpm test && pnpm build:server
+      - name: Web UI (typecheck, build)
+        if: hashFiles('web/src/**') != ''
+        run: pnpm typecheck:web && pnpm build:web
