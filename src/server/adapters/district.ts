@@ -1,7 +1,8 @@
 // District (district.in). Counts only: reads the free-seat count District prints for each show.
 // The seat map itself needs a browser session, so ticketfind cannot pick exact seats here.
 import type { CheckResult, Match, Platform, Watch } from "../types.js";
-import { nearestFirst, niceWhen, showFits, venueDistance } from "../rules.js";
+import { nearestFirst, niceWhen, pickSeats, showFits, venueDistance } from "../rules.js";
+import { districtSeatMap } from "../districtSeats.js";
 import { type Adapter, BROWSER_UA, nextDays, UserError } from "./types.js";
 
 /** /movies/{slug}-movie-tickets-in-{city}-MV{contentId} */
@@ -44,7 +45,7 @@ export const district: Adapter = {
     return {
       id: "district",
       name: "District",
-      depth: "counts",
+      depth: "seats",
       meta: { city: link.city, contentId: link.contentId, base: `${url.origin}${url.pathname}` },
       title: `${name.replace(/\b\w/g, (c: string) => c.toUpperCase())} in ${city}`,
     };
@@ -62,6 +63,7 @@ export const district: Adapter = {
     const matches: Match[] = [];
     let looked = 0;
     let soldOut = 0;
+    let seatChecks = 0;
 
     for (const date of dates) {
       const ms = sessionsOf(await pageData(`${base}?fromdate=${date}`));
@@ -76,11 +78,26 @@ export const district: Adapter = {
           const free = Number(s.avail ?? 0);
           if (free <= 0) soldOut++;
           if (free < watch.want.seats) continue;
+          // District's count can lag: check the real seat map and pick seats that fit the rules.
+          let picked: string[] = [];
+          let good = free;
+          if (seatChecks < 6) {
+            seatChecks++;
+            try {
+              const rows = await districtSeatMap({ cid: String(cinema.entityCode), sid: String(s.sid), pid: String(s.pid), mid: String(s.mid), fid: String(s.fid), fmt: String(s.scrnFmt || "2D"), contentId, date, city: watch.platform.meta.city });
+              const pick = pickSeats(rows, watch.want);
+              if (!pick.seats.length) continue;
+              picked = [...pick.seats].sort((x, y) => x.localeCompare(y, "en", { numeric: true }));
+              good = pick.free;
+            } catch {
+              /* seat map unavailable: fall back to the count */
+            }
+          }
           matches.push({
             when: niceWhen(date, s.showTimeLocal ?? s.showTimeText),
             venue: venue.split(",")[0],
-            seats: [],
-            free,
+            seats: picked,
+            free: good,
             km,
             bookUrl:
               `https://www.district.in/movies/seat-layout/${s.fid}?encsessionid=${cinema.entityCode}-${s.sid}-` +
@@ -92,8 +109,10 @@ export const district: Adapter = {
     }
     const summary = looked
       ? matches.length
-        ? `${matches.length} of ${looked} shows show free seats. District's count can lag, so open it fast.`
-        : `Checked ${looked} shows. All full for now.`
+        ? `${matches.length} of ${looked} shows have seats for you.`
+        : soldOut === looked
+          ? `Sold out right now (${looked} ${looked === 1 ? "show" : "shows"}). Still watching: seats often come back.`
+          : `Checked ${looked} ${looked === 1 ? "show" : "shows"}. None have seats that fit yet.`
       : "No shows fit your rules yet.";
     const state = matches.length ? "open" : looked > 0 && soldOut === looked ? "soldout" : "waiting";
     return { matches: nearestFirst(matches), summary, troubled: 0, state };
