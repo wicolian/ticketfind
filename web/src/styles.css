@@ -371,3 +371,9 @@ a { color: inherit; }
 .price.gone { text-decoration: line-through; color: var(--text-faint); }
 .time .chip-price { text-transform: none; letter-spacing: 0; color: var(--text-faint); font-size: 11px; }
 .eyebrow-note { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand); margin: 0 0 6px; }
+
+/* Rush mode */
+.rush.on { background: var(--brand); border-color: var(--brand); color: var(--brand-text); }
+.rush-feed { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; margin-bottom: 12px; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--border)); font-size: 13px; box-shadow: var(--shadow); }
+.rush-feed ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; max-height: 132px; overflow: auto; }
+.rush-feed time { font-family: var(--mono); color: var(--text-faint); font-size: 12px; margin-right: 6px; }
