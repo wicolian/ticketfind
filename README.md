@@ -8,7 +8,7 @@ First-day shows, concerts, festival buses, a sold-out gig that drops 20 seats at
 
 ![ticketfind found seats](docs/img/seats-open-dark.png)
 
-- **Explore like a ticket site.** Pick your city (or let it find you), browse what's showing, and see every show time by cinema, nearest first, colour-coded by real seat status. Tap a time to check live seats and the best block for your group, then book or get pinged.
+- **Explore every cinema in town.** Pick your city (or let it find you), browse what's showing, and see every show time by cinema, nearest first, colour-coded by real seat status: exact seats at PVR and INOX, show times and free-seat counts from District for everyone else (AGS, Cinepolis, Kasi, Sangam, single screens...). Tap a time to check live seats and the best block for your group, then book or get pinged.
 - **Runs on your computer.** No account, no server, no Supabase. Your settings live in `~/.ticketfind`.
 - **Never books or pays for you.** It finds the seats and hands you the link. You book like a normal person.
 - **Cinemas near you.** Share your location in the browser and ticketfind keeps only cinemas within the distance you pick, nearest first. Your location never leaves your computer.

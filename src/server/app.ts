@@ -70,7 +70,7 @@ export function buildApp(): Hono {
   app.get("/api/explore/shows", async (c) => {
     const q = c.req.query();
     const at = q.lat && q.lng ? { lat: Number(q.lat), lng: Number(q.lng) } : undefined;
-    return c.json(await explore.shows(q.city || "Chennai", q.movie, q.date, at));
+    return c.json(await explore.shows(q.city || "Chennai", q.movie, q.date, at, q.dmovie));
   });
   app.get("/api/explore/seats", async (c) => {
     const q = c.req.query();
