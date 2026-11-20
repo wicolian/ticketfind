@@ -37,7 +37,7 @@ export function WatchCard({ w, onToast }: { w: Watch; onToast: (t: string) => vo
               <div>
                 <strong>{m.when}</strong>
                 <div className="muted" style={{ fontSize: 14 }}>
-                  {m.venue}
+                  {m.venue}{m.km !== undefined ? `, ${m.km} km` : ""}
                   {m.seats.length ? <> {" "}{m.seats.map((s) => <span className="seat" key={s}>{s}</span>)}</> : m.free ? `, ${m.free} free` : ""}
                 </div>
               </div>

@@ -43,6 +43,25 @@ export function NewWatch({ aiReady, onCreated, onOpenSettings }: Props) {
   const [wish, setWish] = useState("");
   const [aiNote, setAiNote] = useState("");
   const [everySec, setEverySec] = useState(30);
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState("");
+
+  function useMyLocation() {
+    if (!("geolocation" in navigator)) return setLocError("This browser can't share a location. Use the Cinemas field instead.");
+    setLocating(true);
+    setLocError("");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        set("near", { lat: Math.round(pos.coords.latitude * 1e4) / 1e4, lng: Math.round(pos.coords.longitude * 1e4) / 1e4, km: want?.near?.km ?? 10 });
+      },
+      () => {
+        setLocating(false);
+        setLocError("Location was blocked. Allow it for this page in the browser, or type cinema names below.");
+      },
+      { timeout: 10_000, maximumAge: 600_000 },
+    );
+  }
 
   const reset = () => {
     setPlatform(null);
@@ -229,7 +248,7 @@ export function NewWatch({ aiReady, onCreated, onOpenSettings }: Props) {
                     <label className="label" htmlFor="front">Avoid front rows</label>
                     <select id="front" className="select" value={want.skipFrontRows} onChange={(e) => set("skipFrontRows", Number(e.target.value))}>
                       <option value={0}>Any row is fine</option>
-                      {[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>Not the {n} front rows</option>)}
+                      {[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>Skip front {n}</option>)}
                     </select>
                   </div>
                 )}
@@ -244,6 +263,25 @@ export function NewWatch({ aiReady, onCreated, onOpenSettings }: Props) {
                   <input id="lang" className="input" placeholder="Any" value={want.languages.join(", ")} onChange={(e) => set("languages", list(e.target.value.toLowerCase()))} />
                 </div>
               </div>
+              <div className="near">
+                <div>
+                  <span className="label" style={{ marginBottom: 2 }}>Cinemas near you</span>
+                  <span className="hint" style={{ margin: 0 }}>
+                    {want.near ? "Only cinemas this close count, nearest first. Your location stays on this computer." : "Skip far-away cinemas and see the nearest seats first."}
+                  </span>
+                </div>
+                {want.near ? (
+                  <div className="row">
+                    <select aria-label="How far" className="select" style={{ width: "auto" }} value={want.near.km} onChange={(e) => set("near", { ...want.near!, km: Number(e.target.value) })}>
+                      {[3, 5, 10, 20, 40].map((k) => <option key={k} value={k}>Within {k} km</option>)}
+                    </select>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => set("near", undefined)}>Anywhere</button>
+                  </div>
+                ) : (
+                  <button type="button" className="btn btn-sm" onClick={useMyLocation} disabled={locating}>{locating ? "Finding you..." : "Use my location"}</button>
+                )}
+              </div>
+              {locError && <p className="hint" style={{ color: "var(--warn)", marginTop: 0 }}>{locError}</p>}
               {platform.depth === "seats" && want.seats > 1 && (
                 <label className="check">
                   <input type="checkbox" checked={want.together} onChange={(e) => set("together", e.target.checked)} />

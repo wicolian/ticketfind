@@ -84,6 +84,32 @@ export function showFits(
   return true;
 }
 
+/** Great-circle distance in km. */
+export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Distance to a venue when the person shared a location. Returns null when the venue is too far,
+ * undefined when there is nothing to measure (no location, or the venue has no coordinates).
+ */
+export function venueDistance(want: Want, lat?: unknown, lng?: unknown): number | null | undefined {
+  if (!want.near) return undefined;
+  const la = Number(lat), ln = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln) || (la === 0 && ln === 0)) return undefined;
+  const km = distanceKm(want.near, { lat: la, lng: ln });
+  return km <= want.near.km ? Math.round(km * 10) / 10 : null;
+}
+
+/** Nearest first when distances are known; otherwise keep the site's order. */
+export function nearestFirst<T extends { km?: number }>(list: T[]): T[] {
+  return [...list].sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity));
+}
+
 /** "Thu 17 Dec, 4:55 PM" */
 export function niceWhen(date: string, time: string): string {
   const d = new Date(`${date}T00:00:00`);
