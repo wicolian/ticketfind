@@ -451,10 +451,10 @@ export async function shows(city: string, movieId: string, date: string | undefi
   // Every other cinema for the same movie and date: District, and chains read from their own websites
   // (Miraj, MovieTime, Mukta A2, Mayajaal ...), all at the same time. A cinema already listed is not repeated.
   if (day) {
-    const title = (await movies(city).catch(() => [])).find((m) => m.id === movieId)?.title ?? "";
     const [more, chains] = await Promise.all([
       districtUrl ? timed("District", on, () => districtShows(districtUrl, day, at), (r) => r.length, [] as CinemaShows[]) : Promise.resolve([] as CinemaShows[]),
-      chainShows(city, title, day, at, on),
+      // The chains match by title, so look it up first; District does not wait for this.
+      movies(city).catch(() => []).then((list) => chainShows(city, list.find((m) => m.id === movieId)?.title ?? "", day, at, on)),
     ]);
     cinemas.push(...more);
     cinemas.push(...dedupe(cinemas, chains));
