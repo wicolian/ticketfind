@@ -110,7 +110,9 @@ export const district: Adapter = {
     const summary = looked
       ? matches.length
         ? `${matches.length} of ${looked} shows have seats for you.`
-        : `Checked ${looked} shows. All full for now.`
+        : soldOut === looked
+          ? `Sold out right now (${looked} ${looked === 1 ? "show" : "shows"}). Still watching: seats often come back.`
+          : `Checked ${looked} ${looked === 1 ? "show" : "shows"}. None have seats that fit yet.`
       : "No shows fit your rules yet.";
     const state = matches.length ? "open" : looked > 0 && soldOut === looked ? "soldout" : "waiting";
     return { matches: nearestFirst(matches), summary, troubled: 0, state };

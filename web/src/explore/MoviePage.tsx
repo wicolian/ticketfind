@@ -84,7 +84,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
                 {seats.price ? <> {rupees(seats.price)} each, <b>{rupees(seats.price * group)} for {group}</b>.</> : null}
               </span>
             ) : (
-              <span>{seats.free} seats free, but none fit {group > 1 ? `${group} together ` : ""}{skip ? `outside the front ${skip} rows` : ""}.</span>
+              <span>{seats.free === 0 ? <>No seats can be booked right now{fromDistrict && (show.free ?? 0) > 0 ? ` (District's list says ${show.free}, but its seat map has none open)` : ""}. Seats often come back.</> : <>{seats.free} seats free, but none fit {group > 1 ? `${group} together ` : ""}{skip ? `outside the front ${skip} rows` : ""}.</>}</span>
             )}
           </div>
           {(() => {
@@ -127,8 +127,8 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
       {seats?.ok && seats.map.length > 0 && (
         <div className="seatmap" aria-label="Seat map, screen at the top">
           <div className="screen-bar">Screen this way</div>
-          {seats.map.map((r) => (
-            <div key={r.row} className={`smap-row ${r.front ? "front" : ""}`}>
+          {seats.map.map((r, ri) => (
+            <div key={`${ri}-${r.row}`} className={`smap-row ${r.front ? "front" : ""}`}>
               <span className="smap-label">{r.row}</span>
               {r.seats.map((f, i) => <i key={i} className={f ? "free" : ""} />)}
             </div>
