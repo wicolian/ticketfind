@@ -75,7 +75,22 @@ export function buildApp(): Hono {
   app.get("/api/explore/shows", async (c) => {
     const q = c.req.query();
     const at = q.lat && q.lng ? { lat: Number(q.lat), lng: Number(q.lng) } : undefined;
-    return c.json(await explore.shows(q.city || "Chennai", q.movie, q.date, at, q.dmovie));
+    if (!q.stream) return c.json(await explore.shows(q.city || "Chennai", q.movie, q.date, at, q.dmovie));
+    // Streamed: one line per site as it answers, then the result. The page shows who is slow.
+    const enc = new TextEncoder();
+    const body = new ReadableStream({
+      async start(ctrl) {
+        const send = (x: unknown) => ctrl.enqueue(enc.encode(JSON.stringify(x) + "\n"));
+        try {
+          const result = await explore.shows(q.city || "Chennai", q.movie, q.date, at, q.dmovie, (p) => send({ type: "source", ...p }));
+          send({ type: "done", result });
+        } catch (e) {
+          send({ type: "error", message: (e as Error).message });
+        }
+        ctrl.close();
+      },
+    });
+    return new Response(body, { headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" } });
   });
   app.get("/api/explore/seats", async (c) => {
     const q = c.req.query();

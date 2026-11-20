@@ -30,6 +30,34 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
+export interface SourceProgress { name: string; state: "asking" | "done" | "failed"; ms?: number; cinemas?: number; note?: string }
+type ShowsResult = { days: string[]; date?: string; cinemas: CinemaShows[] };
+
+/** Show times, streamed: calls onSource as each ticket site answers, then resolves with the result. */
+async function showsLive(path: string, onSource: (p: SourceProgress) => void): Promise<ShowsResult> {
+  const res = await fetch(path);
+  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? `Request failed (${res.status})`); }
+  if (!res.body || !(res.headers.get("content-type") ?? "").includes("ndjson")) return (await res.json()) as ShowsResult;
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (value) buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (!line) continue;
+      const m = JSON.parse(line);
+      if (m.type === "source") onSource(m);
+      else if (m.type === "done") return m.result as ShowsResult;
+      else if (m.type === "error") throw new Error(m.message);
+    }
+    if (done) throw new Error("The show times stopped loading halfway. Try again.");
+  }
+}
+
 export interface City { name: string; lat: number; lng: number; cinemas: number }
 export interface Movie { id: string; title: string; poster: string; backdrop: string; certificate: string; languages: string[]; genres: string[]; minutes: number; release: string; advance: boolean; link: string; districtUrl?: string; shows?: number }
 export interface Show { time: string; hhmm: string; language: string; format: string; screen: string; status: "open" | "filling" | "full" | "closed"; statusText: string; ref: string; bookUrl: string; source: "pvrinox" | "district" | "chain"; free?: number; total?: number; classes?: { label: string; price: number; free: number }[]; priceFrom?: number }
@@ -47,6 +75,8 @@ export const api = {
   trending: () => call<{ trending: { id: string; title: string; poster: string; shows: number; cities: number }[] }>("GET", "/api/explore/trending"),
   shows: (city: string, movie: string, date?: string, at?: { lat: number; lng: number }, dmovie?: string) =>
     call<{ days: string[]; date?: string; cinemas: CinemaShows[] }>("GET", `/api/explore/shows?${qs({ city, movie, date, lat: at?.lat, lng: at?.lng, dmovie })}`),
+  showsLive: (city: string, movie: string, date: string | undefined, at: { lat: number; lng: number } | undefined, dmovie: string | undefined, onSource: (p: SourceProgress) => void) =>
+    showsLive(`/api/explore/shows?${qs({ city, movie, date, lat: at?.lat, lng: at?.lng, dmovie, stream: 1 })}`, onSource),
   seats: (city: string, date: string, ref: string, group: number, skip: number) =>
     call<Seats>("GET", `/api/explore/seats?${qs({ city, date, ref, group, skip })}`),
   state: () => call<{ watches: Watch[]; settings: PublicSettings }>("GET", "/api/state"),

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type CinemaShows, type Movie, type Seats, type Show, type Want } from "../api";
+import { api, type SourceProgress, type CinemaShows, type Movie, type Seats, type Show, type Want } from "../api";
 import { External } from "../icons";
 import { downloadIcs, leaveMinutes, showIcs } from "../calendar";
 import { copy, shareLink } from "../share";
@@ -7,6 +7,46 @@ import { copy, shareLink } from "../share";
 type Where = { lat: number; lng: number } | undefined;
 
 const rupees = (n: number) => `₹${Math.round(n)}`;
+
+/** The loading list: every ticket site we asked, with a live timer, so a slow site gets the blame. */
+function Asking({ sources, since }: { sources: (SourceProgress & { askedAt?: number })[]; since: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = window.setInterval(() => setNow(Date.now()), 100); return () => window.clearInterval(t); }, []);
+  const sec = (ms: number) => `${(Math.max(0, ms) / 1000).toFixed(1)} s`;
+  const waiting = sources.filter((s) => s.state === "asking");
+  const slow = waiting.find((s) => now - (s.askedAt ?? since) > 3000);
+  const order = (s: SourceProgress) => (s.state === "asking" ? 0 : s.state === "failed" ? 1 : 2);
+  return (
+    <div className="card asking" aria-busy="true">
+      <p className="asking-head">{sources.length ? `Asking ${sources.length} ticket ${sources.length === 1 ? "site" : "sites"} for show times` : "Asking the ticket sites for show times"}</p>
+      <ul className="asking-list" aria-live="polite">
+        {[...sources].sort((a, b) => order(a) - order(b) || (b.ms ?? 0) - (a.ms ?? 0)).map((s) => (
+          <li key={s.name} className={`asking-row is-${s.state}`}>
+            <span className="asking-dot" aria-hidden="true" />
+            <b>{s.name}</b>
+            <span className="asking-ms">{s.state === "asking" ? sec(now - (s.askedAt ?? since)) : sec(s.ms ?? 0)}</span>
+            <span className="asking-note">
+              {s.state === "asking" ? "waiting..." : s.state === "failed" ? s.note ?? "did not answer" : s.cinemas ? `${s.cinemas} ${s.cinemas === 1 ? "cinema" : "cinemas"}` : "not showing it"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {slow && <p className="asking-blame">Still waiting on {slow.name}. Their servers, not ours.</p>}
+    </div>
+  );
+}
+
+/** After loading: one line naming the slowest site, so the wait has an owner. */
+function blame(sources: SourceProgress[]): string {
+  const done = sources.filter((s) => s.ms !== undefined);
+  if (done.length < 2) return "";
+  const worst = [...done].sort((a, b) => (b.ms ?? 0) - (a.ms ?? 0))[0];
+  const gone = sources.filter((s) => s.state === "failed").map((s) => s.name);
+  const parts = [] as string[];
+  if ((worst.ms ?? 0) >= 1000 && worst.state === "done") parts.push(`Slowest: ${worst.name}, ${((worst.ms ?? 0) / 1000).toFixed(1)} s`);
+  if (gone.length) parts.push(`${gone.join(", ")} did not answer`);
+  return parts.length ? ` ${parts.join(". ")}.` : "";
+}
 
 const STATUS: Record<Show["status"], string> = { open: "Seats available", filling: "Filling fast", full: "Sold out", closed: "Not on sale" };
 
@@ -196,11 +236,23 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
   const [openOnly, setOpenOnly] = useState(false);
   const [picked, setPicked] = useState<{ cinema: string; ref: string } | null>(null);
 
+  // Which ticket sites were asked, and how long each took: shown while loading, and the slowest one after.
+  const [sources, setSources] = useState<(SourceProgress & { askedAt?: number })[]>([]);
+  const [askedAt, setAskedAt] = useState(0);
+  const loadedKey = useRef("");
   useEffect(() => {
-    setData(null);
-    setError("");
-    prevRef.current = new Map();
-    const load = () => api.shows(city, movie.id, date, where, movie.districtUrl).then((r) => {
+    const key = (d?: string) => [city, movie.id, d, where?.lat, where?.lng].join("|");
+    const keep = loadedKey.current === key(date); // same page, only Rush mode or the picked day changed
+    if (!keep) {
+      setData(null);
+      setError("");
+      setSources([]);
+      setAskedAt(Date.now());
+      prevRef.current = new Map();
+    }
+    const onSource = (p: SourceProgress) => setSources((list) => { const was = list.find((x) => x.name === p.name); return [...list.filter((x) => x.name !== p.name), { ...p, askedAt: was?.askedAt ?? Date.now() }]; });
+    const load = (live: boolean) => (live ? api.showsLive(city, movie.id, date, where, movie.districtUrl, onSource) : api.shows(city, movie.id, date, where, movie.districtUrl)).then((r) => {
+      loadedKey.current = key(r.date);
       const prev = prevRef.current, next = new Map<string, { status: Show["status"]; free?: number }>(), events: { at: number; text: string; ref: string }[] = [];
       for (const c of r.cinemas) for (const s of c.shows) {
         next.set(s.ref, { status: s.status, free: s.free });
@@ -220,9 +272,9 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
       if (events.length) setFeed((f) => [...events, ...f].slice(0, 12));
       setData(r); setDate(r.date); setUpdatedAt(Date.now()); setError("");
     }).catch((e) => setError((e as Error).message));
-    load();
+    if (!keep) load(true);
     // Live: refresh show statuses every 30 seconds while the page is visible.
-    const t = window.setInterval(() => { if (rushRef.current || document.visibilityState === "visible") load(); }, rush ? 15_000 : 30_000);
+    const t = window.setInterval(() => { if (rushRef.current || document.visibilityState === "visible") load(false); }, rush ? 15_000 : 30_000);
     const clock = window.setInterval(() => tick((n) => n + 1), 5_000);
     return () => { window.clearInterval(t); window.clearInterval(clock); };
   }, [city, movie.id, date, where?.lat, where?.lng, rush]);
@@ -345,7 +397,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
       {error ? (
         <div className="callout callout-danger" role="alert">Could not load show times: {error}</div>
       ) : data === null ? (
-        <div className="stack">{[0, 1, 2].map((i) => <div key={i} className="card cinema skeleton"><div className="sk-line" /><div className="sk-line short" /></div>)}</div>
+        <Asking sources={sources} since={askedAt} />
       ) : data && data.days.length === 0 ? (
         <div className="card empty">
           <h3>Tickets aren&apos;t on sale in {city} yet</h3>
@@ -368,7 +420,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
       ) : (
         <>
           <p className="faint" style={{ fontSize: 13, margin: "0 0 8px" }}>
-            <span className="live-dot" aria-hidden="true" /> Live, updated {Math.max(0, Math.round((Date.now() - updatedAt) / 1000))}s ago. {cinemas.length} cinemas, {openShows} shows with seats{where ? ", nearest first" : ""}. Tap a time to check seats.
+            <span className="live-dot" aria-hidden="true" /> Live, updated {Math.max(0, Math.round((Date.now() - updatedAt) / 1000))}s ago. {cinemas.length} cinemas, {openShows} shows with seats{where ? ", nearest first" : ""}. Tap a time to check seats.{blame(sources)}
           </p>
           <div className="stack">
             {cinemas.map((c) => (
