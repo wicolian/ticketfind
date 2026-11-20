@@ -54,6 +54,7 @@ export const api = {
   update: (id: string, patch: Partial<Watch>) => call<Watch>("PATCH", `/api/watches/${id}`, patch),
   checkNow: (id: string) => call<Watch>("POST", `/api/watches/${id}/check`),
   remove: (id: string) => call<{ ok: true }>("DELETE", `/api/watches/${id}`),
+  bulk: (action: "stop" | "pause" | "resume", ids?: string[]) => call<{ done: number }>("POST", "/api/watches/bulk", { action, ids }),
   saveSettings: (s: { channels: PublicSettings["channels"]; aiKey?: string }) => call<PublicSettings>("PUT", "/api/settings", s),
   testPing: () => call<{ sent: string[] }>("POST", "/api/test-ping"),
 };
@@ -67,7 +68,10 @@ export function describeWant(w: Want): string {
     const [h, m] = t.split(":").map(Number);
     return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h >= 12 ? "PM" : "AM"}`;
   };
-  if (w.startAfter && w.startBefore) parts.push(`starts ${fmt(w.startAfter)} to ${fmt(w.startBefore)}`);
+  const mins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const oneShow = w.startAfter && w.startBefore && mins(w.startBefore) - mins(w.startAfter) <= 1;
+  if (oneShow) parts.push(`the ${fmt(w.startAfter!)} show`);
+  else if (w.startAfter && w.startBefore) parts.push(`starts ${fmt(w.startAfter)} to ${fmt(w.startBefore)}`);
   else if (w.startBefore) parts.push(`starts before ${fmt(w.startBefore)}`);
   else if (w.startAfter) parts.push(`starts after ${fmt(w.startAfter)}`);
   if (w.languages.length) parts.push(w.languages.map((l) => l[0].toUpperCase() + l.slice(1)).join(" or "));
@@ -75,7 +79,8 @@ export function describeWant(w: Want): string {
     const d = (s: string) => new Date(`${s}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
     parts.push(w.dates.length === 1 ? d(w.dates[0]) : w.dates.map(d).join(", "));
   }
-  if (w.venues.length) parts.push(`at ${w.venues.join(" or ")}`);
+  const nice = (v: string) => v.replace(/\b(pvr|inox|hdfc)\b/gi, (x) => x.toUpperCase()).replace(/\b([a-z])/g, (c) => c.toUpperCase());
+  if (w.venues.length) parts.push(`at ${w.venues.map(nice).join(" or ")}`);
   if (w.near) parts.push(`within ${w.near.km} km`);
   return parts.join(", ");
 }

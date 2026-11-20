@@ -91,6 +91,17 @@ export function buildApp(): Hono {
     return c.json(await engine.create(body));
   });
 
+  // Bulk: stop, pause or resume many watches at once (all of them when no ids are given).
+  app.post("/api/watches/bulk", async (c) => {
+    const { action, ids } = await c.req.json<{ action: "stop" | "pause" | "resume"; ids?: string[] }>();
+    const targets = engine.list().filter((w) => !ids || ids.includes(w.id)).map((w) => w.id);
+    for (const id of targets) {
+      if (action === "stop") engine.remove(id);
+      else engine.update(id, { status: action === "pause" ? "paused" : "watching" });
+    }
+    return c.json({ done: targets.length });
+  });
+
   app.patch("/api/watches/:id", async (c) => {
     const w = engine.update(c.req.param("id"), await c.req.json());
     return w ? c.json(w) : c.json({ error: "That watch is gone." }, 404);

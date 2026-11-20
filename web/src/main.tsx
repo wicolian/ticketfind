@@ -6,6 +6,7 @@ import { MoviePage } from "./explore/MoviePage";
 import { NewWatch } from "./components/NewWatch";
 import { SettingsSheet } from "./components/SettingsSheet";
 import { WatchCard } from "./components/WatchCard";
+import { BulkActions, WatchingMenu } from "./components/WatchingMenu";
 import { Bell, Settings as Gear, Ticket } from "./icons";
 import "./styles.css";
 
@@ -144,9 +145,7 @@ function App() {
         <a className="brand" href="#/" onClick={(e) => { e.preventDefault(); go("/"); }}><span className="brand-mark"><Ticket size={16} /></span>ticketfind</a>
         <nav className="tabs-nav" aria-label="Main">
           <a href="#/" aria-current={route.page !== "watching" ? "page" : undefined} onClick={(e) => { e.preventDefault(); go("/"); }}>Explore</a>
-          <a href="#/watching" aria-current={route.page === "watching" ? "page" : undefined} onClick={(e) => { e.preventDefault(); go("/watching"); }}>
-            Watching{watches && watches.length > 0 ? <span className={`nav-count ${found ? "hot" : ""}`}>{found || watches.length}</span> : null}
-          </a>
+          <WatchingMenu watches={watches} current={route.page === "watching"} onOpenPage={() => go("/watching")} onToast={say} />
         </nav>
         <div className="top-right">
           <select className="select city" aria-label="City" value={city} onChange={(e) => { setCity(e.target.value); keep("tf.city", e.target.value); }}>
@@ -184,7 +183,7 @@ function App() {
 
           <div className="section-title">
             <h2>Watching</h2>
-            {watches && watches.length > 0 && <span className="faint" style={{ fontSize: 13 }}>{watches.length} {watches.length === 1 ? "link" : "links"}</span>}
+            {watches && watches.length > 0 && <BulkActions watches={watches} onToast={say} />}
           </div>
 
           {watches === null ? (
