@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type CinemaShows, type Movie, type Seats, type Show, type Want } from "../api";
 import { External } from "../icons";
 import { downloadIcs, leaveMinutes, showIcs } from "../calendar";
@@ -152,6 +152,10 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
   const [skip, setSkip] = useState<number>(saved.skip ?? 4);
   const [lang, setLang] = useState<string>(saved.lang ?? "All");
   const [updatedAt, setUpdatedAt] = useState(0);
+  // Rush mode: refresh every 15 s and list seats that come back, with a notification when a sold-out show reopens.
+  const [rush, setRush] = useState(false);
+  const [feed, setFeed] = useState<{ at: number; text: string; ref: string }[]>([]);
+  const prevRef = useRef(new Map<string, { status: Show["status"]; free?: number }>());
   const [, tick] = useState(0);
   const [allWatch, setAllWatch] = useState<"" | "busy" | string>("");
   const [before, setBefore] = useState<string | undefined>();
@@ -186,13 +190,35 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
   useEffect(() => {
     setData(null);
     setError("");
-    const load = () => api.shows(city, movie.id, date, where, movie.districtUrl).then((r) => { setData(r); setDate(r.date); setUpdatedAt(Date.now()); setError(""); }).catch((e) => setError((e as Error).message));
+    prevRef.current = new Map();
+    const load = () => api.shows(city, movie.id, date, where, movie.districtUrl).then((r) => {
+      const prev = prevRef.current, next = new Map<string, { status: Show["status"]; free?: number }>(), events: { at: number; text: string; ref: string }[] = [];
+      for (const c of r.cinemas) for (const s of c.shows) {
+        next.set(s.ref, { status: s.status, free: s.free });
+        const p = prev.get(s.ref);
+        if (!p) continue;
+        const reopened = (p.status === "full" || p.status === "closed") && (s.status === "open" || s.status === "filling");
+        const more = s.free !== undefined && p.free !== undefined && s.free > p.free;
+        if (reopened || more) {
+          const text = `${c.name.split(",")[0]} ${s.time.replace(/^0/, "")}: ${reopened ? "back on sale" : `${s.free! - p.free!} seats came back`}${s.free !== undefined ? ` (now ${s.free})` : ""}`;
+          events.push({ at: Date.now(), text, ref: s.ref });
+          if (reopened && rushRef.current) {
+            try { if (Notification.permission === "granted") new Notification("Seats back on sale", { body: `${movie.title}: ${text}`, tag: s.ref }); } catch { /* fine */ }
+          }
+        }
+      }
+      prevRef.current = next;
+      if (events.length) setFeed((f) => [...events, ...f].slice(0, 12));
+      setData(r); setDate(r.date); setUpdatedAt(Date.now()); setError("");
+    }).catch((e) => setError((e as Error).message));
     load();
     // Live: refresh show statuses every 30 seconds while the page is visible.
-    const t = window.setInterval(() => { if (document.visibilityState === "visible") load(); }, 30_000);
+    const t = window.setInterval(() => { if (rushRef.current || document.visibilityState === "visible") load(); }, rush ? 15_000 : 30_000);
     const clock = window.setInterval(() => tick((n) => n + 1), 5_000);
     return () => { window.clearInterval(t); window.clearInterval(clock); };
-  }, [city, movie.id, date, where?.lat, where?.lng]);
+  }, [city, movie.id, date, where?.lat, where?.lng, rush]);
+  const rushRef = useRef(rush);
+  rushRef.current = rush;
 
   async function watchAll() {
     if (!date) return;
@@ -266,6 +292,14 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
           </label>
         )}
         <label className="check pref-check"><input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} /> Only shows with seats</label>
+        <button
+          className={`btn btn-sm rush ${rush ? "on" : ""}`}
+          aria-pressed={rush}
+          title="Refresh every 15 seconds and list seats as they come back"
+          onClick={() => { const on = !rush; setRush(on); setFeed([]); if (on && "Notification" in window && Notification.permission === "default") void Notification.requestPermission(); }}
+        >
+          {rush ? "Rush mode on" : "Rush mode"}
+        </button>
         {!where && <button className="btn btn-sm" onClick={onLocate}>Sort by distance</button>}
         <div className="prefs-cta">
           {allWatch && allWatch !== "busy" ? (
@@ -278,6 +312,14 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
         </div>
       </div>
 
+      {rush && (
+        <div className="rush-feed" role="log" aria-live="polite" aria-label="Seats freed">
+          <strong>Seats freed</strong>
+          {feed.length === 0 ? <span className="muted"> Watching every 15 seconds. Seats that come back show up here.</span> : (
+            <ul>{feed.map((f) => <li key={f.at + f.ref}><time>{new Date(f.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time> {f.text}</li>)}</ul>
+          )}
+        </div>
+      )}
       {error ? (
         <div className="callout callout-danger" role="alert">Could not load show times: {error}</div>
       ) : data === null ? (
