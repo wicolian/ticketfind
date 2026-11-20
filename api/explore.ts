@@ -18,8 +18,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         cache = 3600;
         break;
       }
-      case "movies":
-        body = { movies: await explore.movies(city) };
+      case "movies": {
+        const [movies, comingSoon] = await Promise.all([explore.movies(city), explore.comingSoon(city).catch(() => [])]);
+        body = { movies, comingSoon };
+        break;
+      }
+      case "trending":
+        body = { trending: await explore.trending() };
+        cache = 600;
         cache = 300;
         break;
       case "shows":

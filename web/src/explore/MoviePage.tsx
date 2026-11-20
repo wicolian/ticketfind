@@ -324,6 +324,20 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
         <div className="callout callout-danger" role="alert">Could not load show times: {error}</div>
       ) : data === null ? (
         <div className="stack">{[0, 1, 2].map((i) => <div key={i} className="card cinema skeleton"><div className="sk-line" /><div className="sk-line short" /></div>)}</div>
+      ) : data && data.days.length === 0 ? (
+        <div className="card empty">
+          <h3>Tickets aren&apos;t on sale in {city} yet</h3>
+          <p>{movie.release ? `It releases ${movie.release}. ` : ""}ticketfind can watch for you and ping you the moment booking opens, before the rush.</p>
+          {allWatch && allWatch !== "busy" ? (
+            <div className="row" style={{ justifyContent: "center", marginTop: 12 }}><span className="done-note" role="status">Watching. We&apos;ll ping you when tickets open.</span><button className="btn btn-ghost btn-sm" onClick={async () => { await onStop(allWatch); setAllWatch(""); }}>Stop</button></div>
+          ) : (
+            <button className="btn btn-primary" style={{ marginTop: 12 }} disabled={allWatch === "busy"} onClick={async () => {
+              setAllWatch("busy");
+              const id = await onWatch(movie.link, { seats: group, together: group > 1, skipFrontRows: skip, dates: [], languages: lang === "All" ? [] : [lang.toLowerCase()], venues: [] }, `${movie.title} when tickets open`);
+              setAllWatch(id);
+            }}>Ping me when tickets open</button>
+          )}
+        </div>
       ) : cinemas.length === 0 ? (
         <div className="card empty">
           <h3>{openOnly ? "No shows with seats on this day" : "No shows on this day"}</h3>
