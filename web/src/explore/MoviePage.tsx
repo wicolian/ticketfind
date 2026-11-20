@@ -11,8 +11,8 @@ function dayLabel(d: string) {
   return { dow: dt.toLocaleDateString("en-GB", { weekday: "short" }), day: dt.getDate(), mon: dt.toLocaleDateString("en-GB", { month: "short" }) };
 }
 
-function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publicMode }: {
-  city: string; date: string; show: Show; cinema: CinemaShows; group: number; skip: number; movie: Movie; publicMode: boolean;
+function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onStop }: {
+  city: string; date: string; show: Show; cinema: CinemaShows; group: number; skip: number; movie: Movie; onStop: (id: string) => unknown;
   onWatch: (url: string, want: Want, label: string) => Promise<string>;
 }) {
   const [watchId, setWatchId] = useState("");
@@ -40,7 +40,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publ
     setWatching("done");
   }
   async function stop() {
-    if (watchId) await api.remove(watchId);
+    if (watchId) await onStop(watchId);
     setWatchId("");
     setWatching("");
   }
@@ -60,7 +60,9 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publ
             ) : seats === null ? (
               <span className="muted">Checking seats with the cinema...</span>
             ) : !seats.ok ? (
-              <span>The cinema did not answer: {seats.reason}</span>
+              /trouble|connect|facing|try again|timeout|went wrong|did not answer/i.test(seats.reason)
+                ? <span>The cinema's site isn't answering right now. Seats may still be there: tap Ping me and ticketfind keeps trying.</span>
+                : <span>This show isn't on sale right now ({seats.reason.replace(/^Sorry,?\s*/i, "").replace(/\.$/, "")}). Ping me and ticketfind will check until it is.</span>
             ) : good ? (
               <span><b className="ok">{seats.freeGood} good seats free.</b> Best for {group}: {seats.best.map((s) => <span key={s} className="seat">{s}</span>)}</span>
             ) : (
@@ -69,9 +71,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publ
           </div>
         </div>
         <div className="row">
-          {publicMode && !good ? (
-            <a className="btn btn-primary" href="https://github.com/wicolian/ticketfind#start" target="_blank" rel="noreferrer">Get pinged with the free app</a>
-          ) : good ? (
+          {good ? (
             <a className="btn btn-primary" href={show.bookUrl} target="_blank" rel="noreferrer">{fromDistrict ? "Book on District" : "Book on PVR INOX"} <External size={14} /></a>
           ) : (
             watching === "done" ? (
@@ -82,7 +82,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publ
               </button>
             )
           )}
-          {good && !publicMode && (
+          {good && (
             watching === "done" ? <span className="row"><span className="done-note" role="status">Watching</span><button className="btn btn-ghost btn-sm" onClick={stop}>Stop</button></span> : <button className="btn" onClick={watch} disabled={watching === "busy"}>Ping me if these go</button>
           )}
         </div>
@@ -103,8 +103,8 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, publ
   );
 }
 
-export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, publicMode = false, aiOn = false }: {
-  city: string; movie: Movie; where: Where; onBack: () => void; onLocate: () => void; publicMode?: boolean; aiOn?: boolean;
+export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onStop, aiOn = false }: {
+  city: string; movie: Movie; where: Where; onBack: () => void; onLocate: () => void; onStop: (id: string) => unknown; aiOn?: boolean;
   onWatch: (url: string, want: Want, label: string) => Promise<string>;
 }) {
   const [data, setData] = useState<{ days: string[]; date?: string; cinemas: CinemaShows[] } | null>(null);
@@ -231,15 +231,15 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, publi
         )}
         <label className="check pref-check"><input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} /> Only shows with seats</label>
         {!where && <button className="btn btn-sm" onClick={onLocate}>Sort by distance</button>}
-        {!publicMode && <div className="prefs-cta">
+        <div className="prefs-cta">
           {allWatch && allWatch !== "busy" ? (
-            <span className="row"><span className="done-note" role="status">Watching every show that fits</span><button className="btn btn-ghost btn-sm" onClick={async () => { await api.remove(allWatch); setAllWatch(""); }}>Stop</button></span>
+            <span className="row"><span className="done-note" role="status">Watching every show that fits</span><button className="btn btn-ghost btn-sm" onClick={async () => { await onStop(allWatch); setAllWatch(""); }}>Stop</button></span>
           ) : (
             <button className="btn btn-primary btn-sm" onClick={watchAll} disabled={!date || allWatch === "busy"} title="One watch for every show on this date that fits these settings">
               {allWatch === "busy" ? "Starting..." : "Ping me for any show that fits"}
             </button>
           )}
-        </div>}
+        </div>
       </div>
 
       {error ? (
@@ -282,7 +282,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, publi
                 </div>
                 {picked?.cinema === c.name && date && (() => {
                   const s = c.shows.find((x) => x.ref === picked.ref);
-                  return s ? <SeatPanel city={city} date={date} show={s} cinema={c} group={group} skip={skip} movie={movie} onWatch={onWatch} publicMode={publicMode} /> : null;
+                  return s ? <SeatPanel city={city} date={date} show={s} cinema={c} group={group} skip={skip} movie={movie} onWatch={onWatch} onStop={onStop} /> : null;
                 })()}
               </article>
             ))}

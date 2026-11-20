@@ -69,6 +69,11 @@ export interface CheckResult {
   summary: string;
   /** Shows the site could not answer for (outage, closed). */
   troubled: number;
+  /**
+   * open: seats that fit. waiting: shows exist, nothing fits yet. soldout: every show is truly full.
+   * down: the cinema's site is failing, so we cannot tell.
+   */
+  state?: "open" | "waiting" | "soldout" | "down";
 }
 
 export type WatchStatus = "watching" | "found" | "paused" | "error";
@@ -92,6 +97,10 @@ export interface Watch {
   lastCheckAt?: string;
   last?: CheckResult;
   lastError?: string;
+  /** When every show has been truly sold out since (ISO). */
+  soldOutSince?: string;
+  /** Why ticketfind stopped on its own (sold out for good, show started). Cleared on resume. */
+  ended?: string;
   /** Newest first, capped. */
   log: LogEntry[];
 }

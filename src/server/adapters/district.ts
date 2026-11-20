@@ -61,6 +61,7 @@ export const district: Adapter = {
     }
     const matches: Match[] = [];
     let looked = 0;
+    let soldOut = 0;
 
     for (const date of dates) {
       const ms = sessionsOf(await pageData(`${base}?fromdate=${date}`));
@@ -73,6 +74,7 @@ export const district: Adapter = {
           if (!showFits({ date, time: s.showTimeLocal ?? s.showTimeText, language: s.lang, venue }, watch.want)) continue;
           looked++;
           const free = Number(s.avail ?? 0);
+          if (free <= 0) soldOut++;
           if (free < watch.want.seats) continue;
           matches.push({
             when: niceWhen(date, s.showTimeLocal ?? s.showTimeText),
@@ -93,6 +95,7 @@ export const district: Adapter = {
         ? `${matches.length} of ${looked} shows show free seats. District's count can lag, so open it fast.`
         : `Checked ${looked} shows. All full for now.`
       : "No shows fit your rules yet.";
-    return { matches: nearestFirst(matches), summary, troubled: 0 };
+    const state = matches.length ? "open" : looked > 0 && soldOut === looked ? "soldout" : "waiting";
+    return { matches: nearestFirst(matches), summary, troubled: 0, state };
   },
 };

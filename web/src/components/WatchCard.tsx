@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { ago, api, describeWant, type Watch } from "../api";
+import { ago, describeWant, type Watch } from "../api";
+import { serverActions, type WatchActions } from "./WatchingMenu";
 import { Chevron, External } from "../icons";
 
 function Status({ w }: { w: Watch }) {
+  if (w.ended) return <span className="pill pill-paused"><span className="dot" />Gave up</span>;
   if (w.status === "paused") return <span className="pill pill-paused"><span className="dot" />Paused</span>;
   if (w.status === "found") return <span className="pill pill-found"><span className="dot" />Seats open</span>;
-  if (w.lastError) return <span className="pill pill-trouble"><span className="dot" />Site trouble</span>;
+  if (w.lastError) return <span className="pill pill-trouble"><span className="dot" />Site down, still trying</span>;
+  if (w.last?.state === "soldout") return <span className="pill pill-watching"><span className="dot" />Sold out, still watching</span>;
   return <span className="pill pill-watching"><span className="dot" />Watching</span>;
 }
 
-export function WatchCard({ w, onToast }: { w: Watch; onToast: (t: string) => void }) {
+export function WatchCard({ w, onToast, actions = serverActions }: { w: Watch; onToast: (t: string) => void; actions?: WatchActions }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [checking, setChecking] = useState(false);
   const matches = w.status === "found" ? (w.last?.matches ?? []) : [];
@@ -49,7 +52,7 @@ export function WatchCard({ w, onToast }: { w: Watch; onToast: (t: string) => vo
           {matches.length > 4 && <p className="hint">{matches.length - 4} more shows also fit.</p>}
         </div>
       ) : (
-        <p className="summary muted">{w.lastError ? `The site is struggling: ${w.lastError}` : (w.last?.summary ?? "First check is running...")}</p>
+        <p className="summary muted">{w.ended ?? w.lastError ?? w.last?.summary ?? "First check is running..."}</p>
       )}
 
       <div className="watch-foot">
@@ -58,15 +61,15 @@ export function WatchCard({ w, onToast }: { w: Watch; onToast: (t: string) => vo
           <button
             className="btn btn-ghost btn-sm"
             disabled={checking || w.status === "paused"}
-            onClick={async () => { setChecking(true); try { await api.checkNow(w.id); } finally { setChecking(false); } }}
+            onClick={async () => { setChecking(true); try { await actions.checkNow?.(w.id); } finally { setChecking(false); } }}
           >
             {checking ? "Checking..." : "Check now"}
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => api.update(w.id, { status: w.status === "paused" ? "watching" : "paused" })}>
-            {w.status === "paused" ? "Resume" : "Pause"}
+          <button className="btn btn-ghost btn-sm" onClick={() => actions.setStatus?.(w.id, w.status === "paused" ? "watching" : "paused")}>
+            {w.status === "paused" ? (w.ended ? "Try again" : "Resume") : "Pause"}
           </button>
           {confirmRemove ? (
-            <button className="btn btn-sm btn-danger" onClick={async () => { await api.remove(w.id); onToast("Stopped watching."); }} onBlur={() => setConfirmRemove(false)} autoFocus>
+            <button className="btn btn-sm btn-danger" onClick={async () => { await actions.remove(w.id); onToast("Stopped watching."); }} onBlur={() => setConfirmRemove(false)} autoFocus>
               Yes, stop watching
             </button>
           ) : (
@@ -75,7 +78,7 @@ export function WatchCard({ w, onToast }: { w: Watch; onToast: (t: string) => vo
         </div>
       </div>
 
-      <details className="fold" style={{ marginTop: 4 }}>
+      {w.log.length > 0 && <details className="fold" style={{ marginTop: 4 }}>
         <summary><Chevron size={16} /> Activity</summary>
         <ul className="log">
           {w.log.map((l, i) => (
@@ -85,7 +88,7 @@ export function WatchCard({ w, onToast }: { w: Watch; onToast: (t: string) => vo
             </li>
           ))}
         </ul>
-      </details>
+      </details>}
     </article>
   );
 }
