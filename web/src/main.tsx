@@ -9,8 +9,8 @@ import { WatchCard } from "./components/WatchCard";
 import { BulkActions, WatchingMenu, serverActions, type WatchActions } from "./components/WatchingMenu";
 import { asWatch, useBrowserWatches } from "./browserWatch";
 import { stateOf } from "./states";
-import { movieFromUrl, readShared } from "./share";
-import { Bell, Pin, Settings as Gear, Ticket } from "./icons";
+import { copy, movieFromUrl, PUBLIC_SITE, readShared } from "./share";
+import { Bell, Pin, Settings as Gear, Ticket, Share } from "./icons";
 import "./styles.css";
 
 function chime() {
@@ -180,6 +180,16 @@ function App() {
 
   const noChannels = settings && !settings.channels.ntfyTopic && !settings.channels.discordWebhook && !settings.channels.slackWebhook && !settings.channels.telegramChatId;
 
+  async function shareApp() {
+    const text = "ticketfind pings you the second seats open at any cinema, so you don't sit refreshing. Free and open source.";
+    try {
+      if (navigator.share) { await navigator.share({ title: "ticketfind", text, url: PUBLIC_SITE }); return; }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return; // they closed the share sheet
+    }
+    say((await copy(`${text} ${PUBLIC_SITE}`)) ? "Link copied. Paste it to a friend." : PUBLIC_SITE);
+  }
+
   return (
     <main className="page">
       <header className="top">
@@ -212,6 +222,9 @@ function App() {
             onClick={() => { if (where) { setWhere(undefined); keep("tf.where", undefined); say("Location off. Cinemas in the site's order."); } else locate(); }}
           >
             <Pin size={15} /> {locating ? "Finding you..." : where ? "Near you" : "Near me"}
+          </button>
+          <button className="btn btn-ghost btn-sm share-app" onClick={shareApp} title="Send ticketfind to a friend who keeps missing tickets">
+            <Share size={15} /> <span>Share</span>
           </button>
           {isPublic ? (
             <a className="btn btn-ghost btn-sm" href={`${REPO}#start`} target="_blank" rel="noreferrer" title="Optional: run npx ticketfind in a terminal for alerts with the browser closed, and on your phone">Get the CLI</a>

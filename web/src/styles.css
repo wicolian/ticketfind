@@ -408,6 +408,9 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) { .asking-row.is-asking .asking-dot { animation: none; } }
 @media (max-width: 520px) { .asking-row { grid-template-columns: 10px 1fr 52px; } .asking-note { grid-column: 2 / -1; } }
 
+.share-app { gap: 6px; }
+@media (max-width: 720px) { .share-app span { display: none; } }
+
 /* Header on narrow screens: state and city share a full row under the brand. */
 @media (max-width: 720px) {
   .top-right { flex-wrap: wrap; width: 100%; min-width: 0; }
