@@ -36,6 +36,8 @@ function publicSettings() {
       telegramChatId: c.telegramChatId ?? "",
     },
     aiReady: Boolean(apiKey()),
+    jevReady: Boolean(s.typesafeApiKey || process.env.TYPESAFE_API_KEY),
+    jevKey: mask(s.typesafeApiKey),
     onTabClose: s.onTabClose ?? "keep",
     aiKey: mask(s.anthropicApiKey),
   };
@@ -125,7 +127,7 @@ export function buildApp(): Hono {
   });
 
   app.put("/api/settings", async (c) => {
-    const next = await c.req.json<{ channels: Record<string, unknown>; aiKey?: string; onTabClose?: "keep" | "stop" }>();
+    const next = await c.req.json<{ channels: Record<string, unknown>; aiKey?: string; jevKey?: string; onTabClose?: "keep" | "stop" }>();
     const cur: Settings = store.settings();
     const channels = { ...cur.channels } as Record<string, unknown>;
     for (const [k, v] of Object.entries(next.channels ?? {})) {
@@ -134,7 +136,8 @@ export function buildApp(): Hono {
       channels[k] = typeof v === "string" ? v.trim() || undefined : v;
     }
     const aiKey = next.aiKey && !next.aiKey.startsWith("••••") ? next.aiKey.trim() || undefined : cur.anthropicApiKey;
-    store.saveSettings({ channels: channels as unknown as Settings["channels"], anthropicApiKey: next.aiKey === "" ? undefined : aiKey, onTabClose: next.onTabClose === "stop" ? "stop" : "keep" });
+    const jevKey = next.jevKey === undefined || next.jevKey.startsWith("••••") ? cur.typesafeApiKey : next.jevKey.trim() || undefined;
+    store.saveSettings({ channels: channels as unknown as Settings["channels"], anthropicApiKey: next.aiKey === "" ? undefined : aiKey, typesafeApiKey: jevKey, onTabClose: next.onTabClose === "stop" ? "stop" : "keep" });
     return c.json(publicSettings());
   });
 

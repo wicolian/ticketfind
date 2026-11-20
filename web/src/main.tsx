@@ -183,7 +183,7 @@ function App() {
       ) : (
         <>
           <div className="explore-head"><h1 className="page-title">Watching</h1><p className="muted" style={{ margin: 0 }}>Shows ticketfind checks for you. Start one from Explore, or paste any booking link.</p></div>
-          <NewWatch aiReady={!!settings?.aiReady} onCreated={(t) => say(`Watching ${t}. We'll ping you when seats open.`)} onOpenSettings={() => setShowSettings(true)} />
+          <NewWatch aiReady={!!settings?.aiReady} jevReady={!!settings?.jevReady} onCreated={(t) => say(`Watching ${t}. We'll ping you when seats open.`)} onOpenSettings={() => setShowSettings(true)} />
 
           {watches && watches.length > 0 && noChannels && (
             <div className="callout callout-warn" style={{ marginTop: 16 }}>

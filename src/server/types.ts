@@ -110,6 +110,8 @@ export interface Settings {
   channels: Channels;
   /** Optional. Lets ticketfind read your request in plain words. An Anthropic (sk-ant-) or OpenRouter (sk-or-) key. */
   anthropicApiKey?: string;
+  /** Optional. TypeSafe key: Jev reads event pages and says when tickets go on sale. */
+  typesafeApiKey?: string;
   /** What happens when the last ticketfind tab closes. Default keep. */
   onTabClose?: "keep" | "stop";
 }

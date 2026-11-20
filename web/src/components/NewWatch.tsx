@@ -29,11 +29,12 @@ const EVERY = [
 
 interface Props {
   aiReady: boolean;
+  jevReady?: boolean;
   onCreated: (title: string) => void;
   onOpenSettings: () => void;
 }
 
-export function NewWatch({ aiReady, onCreated, onOpenSettings }: Props) {
+export function NewWatch({ aiReady, jevReady = false, onCreated, onOpenSettings }: Props) {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState<"" | "inspect" | "ai" | "create">("");
   const [error, setError] = useState("");
@@ -129,7 +130,7 @@ export function NewWatch({ aiReady, onCreated, onOpenSettings }: Props) {
 
   const set = <K extends keyof Want>(k: K, v: Want[K]) => setWant((w) => (w ? { ...w, [k]: v } : w));
   const list = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
-  const pageNeedsWords = platform?.depth === "page" && !page.openText && !page.closedText;
+  const pageNeedsWords = platform?.depth === "page" && !jevReady && !page.openText && !page.closedText;
 
   return (
     <section className="card">
@@ -222,6 +223,12 @@ export function NewWatch({ aiReady, onCreated, onOpenSettings }: Props) {
           </div>
 
           {platform.depth === "page" ? (
+            <>
+            {jevReady && (
+              <div className="callout callout-ok">
+                <span>Jev will read this page and ping you when tickets can be bought. Add words below only if you want to match exact text instead.</span>
+              </div>
+            )}
             <div className="grid">
               <div>
                 <label className="label" htmlFor="closed">Text shown while you can't book</label>
@@ -234,6 +241,7 @@ export function NewWatch({ aiReady, onCreated, onOpenSettings }: Props) {
                 <p className="hint">When this appears, you get pinged.</p>
               </div>
             </div>
+            </>
           ) : (
             <>
               <div className="grid">

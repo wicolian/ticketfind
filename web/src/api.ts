@@ -14,6 +14,8 @@ export interface PublicSettings {
   };
   aiReady: boolean;
   aiKey: string;
+  jevReady: boolean;
+  jevKey: string;
   onTabClose: "keep" | "stop";
 }
 
@@ -59,7 +61,7 @@ export const api = {
   meta: () => call<{ public: boolean; ai: boolean }>("GET", "/api/meta"),
   understandShow: (text: string, title: string, url: string) =>
     call<{ want: Want }>("POST", "/api/understand", { text, title, url, platform: { id: "pvr-inox", name: "PVR INOX", depth: "seats", meta: {}, title } }),
-  saveSettings: (s: { channels: PublicSettings["channels"]; aiKey?: string; onTabClose?: "keep" | "stop" }) => call<PublicSettings>("PUT", "/api/settings", s),
+  saveSettings: (s: { channels: PublicSettings["channels"]; aiKey?: string; jevKey?: string; onTabClose?: "keep" | "stop" }) => call<PublicSettings>("PUT", "/api/settings", s),
   testPing: () => call<{ sent: string[] }>("POST", "/api/test-ping"),
 };
 
