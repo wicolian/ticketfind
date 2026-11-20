@@ -140,18 +140,49 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
   );
 }
 
-export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onStop, aiOn = false }: {
-  city: string; movie: Movie; where: Where; onBack: () => void; onLocate: () => void; onStop: (id: string) => unknown; aiOn?: boolean;
+/** Time of day presets for the filter row. Times are the show's start, 24 h. */
+const TIMES: Record<string, { label: string; after?: string; before?: string }> = {
+  any: { label: "Any time" },
+  morning: { label: "Morning", before: "12:00" },
+  before7: { label: "Before 7 PM", before: "19:00" },
+  evening: { label: "Evening", after: "17:00", before: "21:00" },
+  late: { label: "Late night", after: "21:00" },
+};
+const ampm = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "AM" : "PM"}`; };
+
+/** What a plain-words search on Explore asked for, handed to this page once. */
+export interface Intent { movieId: string; group?: number; skip?: number; lang?: string; date?: string; after?: string; before?: string; place?: string }
+function takeIntent(movieId: string): Intent | null {
+  try {
+    const x = JSON.parse(sessionStorage.getItem("tf.intent") ?? "null") as Intent | null;
+    if (x?.movieId !== movieId) return null;
+    sessionStorage.removeItem("tf.intent");
+    return x;
+  } catch {
+    return null;
+  }
+}
+
+export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onStop }: {
+  city: string; movie: Movie; where: Where; onBack: () => void; onLocate: () => void; onStop: (id: string) => unknown;
   onWatch: (url: string, want: Want, label: string) => Promise<string>;
 }) {
+  const [intent] = useState(() => takeIntent(movie.id));
   const [data, setData] = useState<{ days: string[]; date?: string; cinemas: CinemaShows[] } | null>(null);
-  const [date, setDate] = useState<string | undefined>();
+  const [date, setDate] = useState<string | undefined>(intent?.date);
   const [error, setError] = useState("");
   // Preferences stick across movies and visits.
   const saved = (() => { try { return JSON.parse(localStorage.getItem("tf.prefs") ?? "{}"); } catch { return {}; } })();
-  const [group, setGroup] = useState<number>(saved.group ?? 2);
-  const [skip, setSkip] = useState<number>(saved.skip ?? 4);
-  const [lang, setLang] = useState<string>(saved.lang ?? "All");
+  const [group, setGroup] = useState<number>(intent?.group ?? saved.group ?? 2);
+  const [skip, setSkip] = useState<number>(intent?.skip ?? saved.skip ?? 4);
+  const [lang, setLang] = useState<string>(intent?.lang ? intent.lang[0].toUpperCase() + intent.lang.slice(1) : saved.lang ?? "All");
+  // Time of day: a preset, or the exact span a plain-words search asked for.
+  const custom = intent && (intent.after || intent.before) ? { after: intent.after, before: intent.before } : undefined;
+  const preset = custom && Object.keys(TIMES).find((k) => TIMES[k].after === custom.after && TIMES[k].before === custom.before);
+  const [time, setTime] = useState<string>(custom ? preset ?? "custom" : TIMES[saved.time] ? saved.time : "any");
+  const span = time === "custom" ? custom : TIMES[time];
+  const before = span?.before, after = span?.after;
+  const [place, setPlace] = useState(intent?.place ?? "");
   const [updatedAt, setUpdatedAt] = useState(0);
   // Rush mode: refresh every 15 s and list seats that come back, with a notification when a sold-out show reopens.
   const [rush, setRush] = useState(false);
@@ -159,32 +190,9 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
   const prevRef = useRef(new Map<string, { status: Show["status"]; free?: number }>());
   const [, tick] = useState(0);
   const [allWatch, setAllWatch] = useState<"" | "busy" | string>("");
-  const [before, setBefore] = useState<string | undefined>();
-  const [after, setAfter] = useState<string | undefined>();
-  const [wish, setWish] = useState("");
-  const [wishState, setWishState] = useState<"" | "busy" | string>("");
-
-  async function applyWish(e: React.FormEvent) {
-    e.preventDefault();
-    if (!wish.trim()) return;
-    setWishState("busy");
-    try {
-      const { want } = await api.understandShow(wish, movie.title, movie.link);
-      setGroup(want.seats);
-      setSkip(want.skipFrontRows);
-      const l = want.languages[0];
-      if (l) setLang(langs.find((x) => x.toLowerCase() === l.toLowerCase()) ?? "All");
-      if (want.dates[0] && data?.days.includes(want.dates[0])) setDate(want.dates[0]);
-      setBefore(want.startBefore);
-      setAfter(want.startAfter);
-      setWishState("");
-    } catch (err) {
-      setWishState((err as Error).message);
-    }
-  }
   useEffect(() => {
-    try { localStorage.setItem("tf.prefs", JSON.stringify({ group, skip, lang })); } catch { /* private window */ }
-  }, [group, skip, lang]);
+    try { localStorage.setItem("tf.prefs", JSON.stringify({ group, skip, lang, time: time === "custom" ? "any" : time })); } catch { /* private window */ }
+  }, [group, skip, lang, time]);
   const [openOnly, setOpenOnly] = useState(false);
   const [picked, setPicked] = useState<{ cinema: string; ref: string } | null>(null);
 
@@ -226,16 +234,25 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
     setAllWatch("busy");
     const want: Want = {
       seats: group, together: group > 1, skipFrontRows: skip, dates: [date],
-      languages: lang === "All" ? [] : [lang.toLowerCase()], venues: [],
+      languages: lang === "All" ? [] : [lang.toLowerCase()], venues: place ? [place.toLowerCase()] : [],
+      ...(after ? { startAfter: after } : {}),
+      ...(before ? { startBefore: before } : {}),
       ...(where ? { near: { ...where, km: 10 } } : {}),
     };
     const id = await onWatch(movie.link, want, `${movie.title} on ${dayLabel(date).dow} ${dayLabel(date).day} ${dayLabel(date).mon}`);
     setAllWatch(id);
   }
 
-  const langs = useMemo(() => ["All", ...new Set((data?.cinemas ?? []).flatMap((c) => c.shows.map((s) => s.language)).filter(Boolean))], [data]);
+  const langs = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of data?.cinemas ?? []) for (const s of c.shows) if (s.language) seen.set(s.language.toLowerCase(), s.language);
+    if (lang !== "All") seen.set(lang.toLowerCase(), seen.get(lang.toLowerCase()) ?? lang);
+    return ["All", ...seen.values()];
+  }, [data, lang]);
+  const near = place.toLowerCase();
   const cinemas = (data?.cinemas ?? [])
-    .map((c) => ({ ...c, shows: c.shows.filter((s) => (lang === "All" || s.language === lang) && (!openOnly || s.status === "open" || s.status === "filling") && (!before || s.hhmm < before) && (!after || s.hhmm >= after)) }))
+    .filter((c) => !near || `${c.name} ${c.address}`.toLowerCase().includes(near))
+    .map((c) => ({ ...c, shows: c.shows.filter((s) => (lang === "All" || s.language.toLowerCase() === lang.toLowerCase()) && (!openOnly || s.status === "open" || s.status === "filling") && (!before || s.hhmm < before) && (!after || s.hhmm >= after)) }))
     .filter((c) => c.shows.length);
   const openShows = cinemas.reduce((n, c) => n + c.shows.filter((s) => s.status === "open" || s.status === "filling").length, 0);
 
@@ -264,17 +281,15 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
         </div>
       )}
 
-      {aiOn && (
-        <form className="wish" onSubmit={applyWish}>
-          <input className="input" aria-label="Say what you want" placeholder='Or just type it: "2 seats before 7 pm, not the front rows, English"' value={wish} onChange={(e) => setWish(e.target.value)} maxLength={300} />
-          <button className="btn" disabled={!wish.trim() || wishState === "busy"}>{wishState === "busy" ? "Reading..." : "Set filters"}</button>
-        </form>
+      {intent?.date && data && data.days.length > 0 && !data.days.includes(intent.date) && (
+        <p className="hint" role="status" style={{ marginTop: -4 }}>
+          No shows on {dayLabel(intent.date).dow} {dayLabel(intent.date).day} {dayLabel(intent.date).mon} yet. These are the first days on sale.
+        </p>
       )}
-      {wishState && wishState !== "busy" && <p className="hint" style={{ color: "var(--warn)", marginTop: -8 }}>{wishState}</p>}
-      {(before || after) && (
+      {place && (
         <div className="chips" style={{ marginBottom: 12 }}>
-          <button className="chip" aria-pressed="true" onClick={() => { setBefore(undefined); setAfter(undefined); }} aria-label="Clear the time filter">
-            {after && before ? `${after} to ${before}` : before ? `Starts before ${before}` : `Starts from ${after}`} <span aria-hidden="true">x</span>
+          <button className="chip" aria-pressed="true" onClick={() => setPlace("")} aria-label={`Show cinemas everywhere, not only ${place}`}>
+            Cinemas in {place} <span aria-hidden="true">x</span>
           </button>
         </div>
       )}
@@ -285,6 +300,12 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
         <label className="pref">Rows
           <select className="select" value={skip} onChange={(e) => setSkip(Number(e.target.value))}>
             <option value={0}>Any row</option>{[2, 3, 4, 5].map((n) => <option key={n} value={n}>Skip front {n}</option>)}
+          </select>
+        </label>
+        <label className="pref">Time
+          <select className="select" value={time} onChange={(e) => setTime(e.target.value)}>
+            {Object.entries(TIMES).map(([k, t]) => <option key={k} value={k}>{t.label}</option>)}
+            {custom && !preset && <option value="custom">{custom.after && custom.before ? `${ampm(custom.after)} to ${ampm(custom.before)}` : custom.before ? `Before ${ampm(custom.before)}` : `From ${ampm(custom.after!)}`}</option>}
           </select>
         </label>
         {langs.length > 2 && (

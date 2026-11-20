@@ -201,7 +201,7 @@ function App() {
             <Pin size={15} /> {locating ? "Finding you..." : where ? "Near you" : "Near me"}
           </button>
           {isPublic ? (
-            <a className="btn btn-ghost btn-sm" href={`${REPO}#start`} target="_blank" rel="noreferrer" title="Optional: alerts with the browser closed, and on your phone">Desktop app</a>
+            <a className="btn btn-ghost btn-sm" href={`${REPO}#start`} target="_blank" rel="noreferrer" title="Optional: run npx ticketfind in a terminal for alerts with the browser closed, and on your phone">Get the CLI</a>
           ) : (
             <button className="btn btn-ghost btn-sm" onClick={() => setShowSettings(true)} disabled={!settings} aria-label="Alerts"><Gear size={16} /></button>
           )}
@@ -235,10 +235,10 @@ function App() {
           );
         })()
       ) : route.page === "explore" ? (
-        <ExplorePage city={city} onOpen={(m) => { setMovie(m); go(`/movie/${m.id}`); }} />
+        <ExplorePage city={city} aiOn={aiOn || !!settings?.aiReady} onOpen={(m) => { setMovie(m); go(`/movie/${m.id}`); }} />
       ) : route.page === "movie" ? (
         movie ? (
-          <MoviePage city={city} movie={movie} where={where} onBack={() => go("/")} onLocate={locate} onWatch={watchShow} onStop={(id) => actions.remove(id)} aiOn={aiOn || !!settings?.aiReady} />
+          <MoviePage city={city} movie={movie} where={where} onBack={() => go("/")} onLocate={locate} onWatch={watchShow} onStop={(id) => actions.remove(id)} />
         ) : (
           <div className="card empty"><p className="muted">Loading the movie...</p></div>
         )
