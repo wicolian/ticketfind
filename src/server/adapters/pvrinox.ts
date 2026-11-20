@@ -1,7 +1,7 @@
 // PVR INOX (inoxmovies.com, pvrcinemas.com). Seat-level: reads the same seat map the site draws.
 // Rows come screen-first; seat status 1 = free, 2 = taken, 0 = gap (aisle).
 import type { CheckResult, Match, Platform, Watch } from "../types.js";
-import { niceWhen, pickSeats, showFits, type Row } from "../rules.js";
+import { nearestFirst, niceWhen, pickSeats, showFits, venueDistance, type Row } from "../rules.js";
 import { type Adapter, BROWSER_UA, nextDays, UserError } from "./types.js";
 
 const API = "https://api3.inoxmovies.com/api/v1/booking/";
@@ -110,6 +110,8 @@ export const pvrInox: Adapter = {
       const res = await sessions(city, movieId, date);
       for (const cs of res?.output?.movieCinemaSessions ?? []) {
         const venue: string = cs.cinema?.name ?? "Cinema";
+        const km = venueDistance(watch.want, cs.cinema?.latitude, cs.cinema?.longitude);
+        if (km === null) continue; // farther than the person wants to travel
         for (const exp of cs.experienceSessions ?? []) {
           for (const show of exp.shows ?? []) {
             if (!showFits({ date, time: show.showTime, language: show.language, venue }, watch.want)) continue;
@@ -144,6 +146,7 @@ export const pvrInox: Adapter = {
                 seats: [...pick.seats].sort((a, b) => a.localeCompare(b, "en", { numeric: true })),
                 free: pick.free,
                 bookUrl: `https://www.inoxmovies.com/seatlayout/${show.encrypted}`,
+                km,
               });
             }
           }
@@ -157,6 +160,6 @@ export const pvrInox: Adapter = {
         : matches.length
           ? `${matches.length} of ${looked} shows have seats for you.`
           : `Checked ${looked} shows. None have seats that fit yet.${troubled ? ` ${troubled} could not reach the cinema.` : ""}`;
-    return { matches, summary, troubled };
+    return { matches: nearestFirst(matches), summary, troubled };
   },
 };

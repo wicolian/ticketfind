@@ -1,7 +1,7 @@
 // District (district.in). Counts only: reads the free-seat count District prints for each show.
 // The seat map itself needs a browser session, so ticketfind cannot pick exact seats here.
 import type { CheckResult, Match, Platform, Watch } from "../types.js";
-import { niceWhen, showFits } from "../rules.js";
+import { nearestFirst, niceWhen, showFits, venueDistance } from "../rules.js";
 import { type Adapter, BROWSER_UA, nextDays, UserError } from "./types.js";
 
 /** /movies/{slug}-movie-tickets-in-{city}-MV{contentId} */
@@ -66,6 +66,8 @@ export const district: Adapter = {
       const ms = sessionsOf(await pageData(`${base}?fromdate=${date}`));
       for (const cinema of ms?.arrangedSessions ?? []) {
         const venue: string = cinema.entityName ?? "Cinema";
+        const km = venueDistance(watch.want, cinema.data?.lat, cinema.data?.lon);
+        if (km === null) continue; // farther than the person wants to travel
         for (const s of cinema.sessions ?? []) {
           if (s.showDate !== date) continue;
           if (!showFits({ date, time: s.showTimeLocal ?? s.showTimeText, language: s.lang, venue }, watch.want)) continue;
@@ -77,6 +79,7 @@ export const district: Adapter = {
             venue: venue.split(",")[0],
             seats: [],
             free,
+            km,
             bookUrl:
               `https://www.district.in/movies/seat-layout/${s.fid}?encsessionid=${cinema.entityCode}-${s.sid}-` +
               `${String(s.mid).toLowerCase()}-${cinema.entityCode}&freeseating=false&fromsessions=&type=MOVIES` +
@@ -90,6 +93,6 @@ export const district: Adapter = {
         ? `${matches.length} of ${looked} shows show free seats. District's count can lag, so open it fast.`
         : `Checked ${looked} shows. All full for now.`
       : "No shows fit your rules yet.";
-    return { matches, summary, troubled: 0 };
+    return { matches: nearestFirst(matches), summary, troubled: 0 };
   },
 };

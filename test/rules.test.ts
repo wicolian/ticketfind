@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickSeats, showFits, toHHMM, niceWhen, type Row } from "../src/server/rules.js";
+import { pickSeats, showFits, toHHMM, niceWhen, distanceKm, venueDistance, nearestFirst, type Row } from "../src/server/rules.js";
 import { DEFAULT_WANT } from "../src/server/types.js";
 
 const row = (name: string, pattern: string): Row => ({
@@ -37,6 +37,26 @@ describe("showFits", () => {
   });
   it("drops another language", () => {
     expect(showFits({ date: "2026-12-17", time: "01:00 PM", language: "Tamil" }, want)).toBe(false);
+  });
+});
+
+describe("near me", () => {
+  const velachery = { lat: 12.9791, lng: 80.2209 };
+  const want = { ...DEFAULT_WANT, near: { ...velachery, km: 10 } };
+  it("measures real distances", () => {
+    // Phoenix Market City Velachery to Marina Mall OMR is about 16 km in a straight line.
+    expect(Math.round(distanceKm({ lat: 12.9927, lng: 80.2167 }, { lat: 12.836, lng: 80.2294 }))).toBe(17);
+  });
+  it("keeps close venues and drops far ones", () => {
+    expect(venueDistance(want, 12.9927, 80.2167)).toBe(1.6);
+    expect(venueDistance(want, 12.836, 80.2294)).toBeNull();
+  });
+  it("ignores venues without coordinates instead of dropping them", () => {
+    expect(venueDistance(want, 0, 0)).toBeUndefined();
+    expect(venueDistance({ ...DEFAULT_WANT }, 12.99, 80.21)).toBeUndefined();
+  });
+  it("sorts nearest first", () => {
+    expect(nearestFirst([{ km: 9 }, { km: undefined }, { km: 2 }]).map((m) => m.km)).toEqual([2, 9, undefined]);
   });
 });
 

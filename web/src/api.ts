@@ -59,6 +59,7 @@ export function describeWant(w: Want): string {
     parts.push(w.dates.length === 1 ? d(w.dates[0]) : w.dates.map(d).join(", "));
   }
   if (w.venues.length) parts.push(`at ${w.venues.join(" or ")}`);
+  if (w.near) parts.push(`within ${w.near.km} km`);
   return parts.join(", ");
 }
 
