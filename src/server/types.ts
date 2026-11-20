@@ -18,6 +18,8 @@ export interface Want {
   languages: string[];
   /** Only venues whose name contains one of these words. Empty = any venue the link covers. */
   venues: string[];
+  /** Only venues within km of this point. Set from the browser; never sent to any site. */
+  near?: { lat: number; lng: number; km: number };
 }
 
 /** For plain web pages: what the page says when tickets are or are not on sale. */
@@ -56,6 +58,8 @@ export interface Match {
   free: number;
   /** Where to book it. */
   bookUrl: string;
+  /** Distance from the person, when they shared their location. */
+  km?: number;
 }
 
 /** Result of one check. */

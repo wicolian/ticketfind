@@ -164,6 +164,9 @@ a { color: inherit; }
 .fold[open] summary .chev { transform: rotate(90deg); }
 .chev { transition: transform 0.15s; }
 
+.near { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.near > div:first-child { display: grid; min-width: 0; flex: 1 1 260px; }
+
 /* Callouts */
 .callout { display: flex; gap: 12px; padding: 12px 14px; border-radius: var(--radius-sm); font-size: 14px; }
 .callout-warn { background: var(--warn-soft); color: var(--text); }

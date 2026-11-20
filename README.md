@@ -8,6 +8,7 @@ First-day shows, concerts, festival buses, a sold-out gig that drops 20 seats at
 
 - **Runs on your computer.** No account, no server, no Supabase. Your settings live in `~/.ticketfind`.
 - **Never books or pays for you.** It finds the seats and hands you the link. You book like a normal person.
+- **Cinemas near you.** Share your location in the browser and ticketfind keeps only cinemas within the distance you pick, nearest first. Your location never leaves your computer.
 - **Kind to struggling sites.** It checks no faster than every 15 seconds and backs off when a site keeps failing.
 
 ## Start
