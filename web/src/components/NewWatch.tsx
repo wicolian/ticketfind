@@ -212,7 +212,7 @@ export function NewWatch({ aiReady, onCreated, onOpenSettings }: Props) {
                 <span className="hint" style={{ margin: 0 }}>
                   Fill the fields below, or{" "}
                   <button type="button" className="btn-ghost" style={{ border: 0, padding: 0, textDecoration: "underline", cursor: "pointer", background: "none" }} onClick={onOpenSettings}>
-                    add a Claude key
+                    add an AI key
                   </button>{" "}
                   to type it in plain words.
                 </span>
