@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type CinemaShows, type Movie, type Seats, type Show, type Want } from "../api";
 import { External } from "../icons";
+import { downloadIcs, leaveMinutes, showIcs } from "../calendar";
 
 type Where = { lat: number; lng: number } | undefined;
 
@@ -97,6 +98,13 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
               </button>
             )
           )}
+          <button
+            className="btn btn-ghost btn-sm"
+            title={`Adds the show with a reminder to leave about ${leaveMinutes(cinema.km)} minutes before`}
+            onClick={() => downloadIcs(`${movie.title} ${show.time}`, showIcs({ title: movie.title, cinema: cinema.name, address: cinema.address, date, hhmm: show.hhmm, minutes: movie.minutes, km: cinema.km, bookUrl: show.bookUrl }))}
+          >
+            Add to calendar
+          </button>
           {good && (
             watching === "done" ? <span className="row"><span className="done-note" role="status">Watching</span><button className="btn btn-ghost btn-sm" onClick={stop}>Stop</button></span> : <button className="btn" onClick={watch} disabled={watching === "busy"}>Ping me if these go</button>
           )}
