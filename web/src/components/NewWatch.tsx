@@ -229,6 +229,12 @@ export function NewWatch({ aiReady, jevReady = false, onCreated, onOpenSettings 
                 <span>Jev will read this page and ping you when tickets can be bought. Add words below only if you want to match exact text instead.</span>
               </div>
             )}
+            {jevReady && (
+              <label className="check">
+                <input type="checkbox" checked={!!page.picture} onChange={(e) => setPage({ ...page, picture: e.target.checked })} />
+                <span>Also look at the page as a picture <span className="muted">(for sites that draw tickets as images; needs agent-browser)</span></span>
+              </label>
+            )}
             <div className="grid">
               <div>
                 <label className="label" htmlFor="closed">Text shown while you can't book</label>

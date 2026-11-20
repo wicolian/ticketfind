@@ -3,6 +3,28 @@ import type { CheckResult, Platform, Watch } from "../types.js";
 import { type Adapter, BROWSER_UA, UserError } from "./types.js";
 import { askSaleState } from "../jev.js";
 import { store } from "../store.js";
+import { execFile } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+/** A 1280x900 screenshot of the page, taken with agent-browser if it is installed. Undefined if not. */
+async function screenshot(url: string): Promise<Buffer | undefined> {
+  const dir = mkdtempSync(join(tmpdir(), "tf-shot-"));
+  const file = join(dir, "page.png");
+  const run = (args: string[]) => new Promise<void>((ok, fail) => execFile("agent-browser", args, { env: { ...process.env, AGENT_BROWSER_SESSION: "ticketfind-shot" }, timeout: 60_000 }, (e) => (e ? fail(e) : ok())));
+  try {
+    await run(["set", "viewport", "1280", "900"]);
+    await run(["open", url]);
+    await new Promise((r) => setTimeout(r, 5000));
+    await run(["screenshot", file]);
+    return readFileSync(file);
+  } catch {
+    return undefined; // no agent-browser, or the page did not load: Jev reads the text only
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 /** Jev reads the page when a TypeSafe key is set and no words were given. */
 export function jevKey(): string | undefined {
@@ -61,16 +83,17 @@ export const page: Adapter = {
     if (status >= 500) return { matches: [], summary: `The site is down right now (HTTP ${status}). Still trying.`, troubled: 1, state: "down" };
     const key = jevKey();
     if (key && !watch.page?.openText && !watch.page?.closedText) {
-      const a = await askSaleState(key, { title, url: watch.url, text }, "");
+      const shot = watch.page?.picture ? await screenshot(watch.url) : undefined;
+      const a = await askSaleState(key, { title, url: watch.url, text, screenshot: shot }, "");
       const open = a.state === "on_sale" && a.confidence >= OPEN_AT;
       const pct = Math.round(a.confidence * 100);
       return open
         ? {
             matches: [{ when: "Now", venue: new URL(watch.url).hostname.replace(/^www\./, ""), seats: [], free: 0, bookUrl: watch.url }],
-            summary: `Jev read the page: tickets are on sale (${pct}% sure).`,
+            summary: `Jev ${shot ? "looked at" : "read"} the page: tickets are on sale (${pct}% sure).`,
             troubled: 0,
           }
-        : { matches: [], summary: `Jev read the page: ${SALE_WORDS[a.state]} (${pct}% sure).`, troubled: 0, state: a.state === "sold_out" && a.confidence >= OPEN_AT ? "soldout" : "waiting" };
+        : { matches: [], summary: `Jev ${shot ? "looked at" : "read"} the page: ${SALE_WORDS[a.state]} (${pct}% sure).`, troubled: 0, state: a.state === "sold_out" && a.confidence >= OPEN_AT ? "soldout" : "waiting" };
     }
     const lower = text.toLowerCase();
     const open = watch.page?.openText?.toLowerCase();

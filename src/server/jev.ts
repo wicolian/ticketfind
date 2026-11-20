@@ -10,14 +10,17 @@ export interface SaleAnswer {
   probabilities: Record<SaleState, number>;
 }
 
-export async function askSaleState(apiKey: string, page: { title: string; url: string; text: string }, wish: string): Promise<SaleAnswer> {
+export async function askSaleState(apiKey: string, page: { title: string; url: string; text: string; screenshot?: Buffer }, wish: string): Promise<SaleAnswer> {
+  // With a screenshot, Jev also looks at the page as a picture (for sites that draw tickets as images).
+  const shot = page.screenshot;
   const res = await fetch("https://api.typesafe.ai/v1/systemone", {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", ...(shot ? { "TypeSafe-Danger-Zone-Images": "true" } : {}) },
     body: JSON.stringify({
+      ...(shot ? { assets: { "tf-page-shot": { type: "image", data_base64: shot.toString("base64"), format: "png" } } } : {}),
       model: process.env.TICKETFIND_JEV_MODEL || "jev-latest",
       state: {
-        page: { title: page.title, address: page.url, visible_text: page.text.slice(0, 12_000) },
+        page: { title: page.title, address: page.url, visible_text: page.text.slice(0, 12_000), ...(shot ? { screenshot: "tf-page-shot" } : {}) },
         what_the_person_wants: wish || "buy tickets for this event",
       },
       questions: {
