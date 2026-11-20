@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type CinemaShows, type Movie, type Seats, type Show, type Want } from "../api";
 import { External } from "../icons";
 import { downloadIcs, leaveMinutes, showIcs } from "../calendar";
+import { copy, shareLink } from "../share";
 
 type Where = { lat: number; lng: number } | undefined;
 
@@ -32,6 +33,16 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
 
   // Watch rules match on the cinema's full name, so the watch can never spill over to another cinema.
   const word = cinema.name.replace(/\s*\(.*\)\s*/g, " ").trim();
+  const [shared, setShared] = useState("");
+  function wantForShow(): Want {
+    const [h, m] = show.hhmm.split(":").map(Number);
+    const next = `${String(h + Math.floor((m + 1) / 60)).padStart(2, "0")}:${String((m + 1) % 60).padStart(2, "0")}`;
+    return { seats: group, together: group > 1, skipFrontRows: skip, dates: [date], languages: show.language ? [show.language.toLowerCase()] : [], venues: [word.toLowerCase()], startAfter: show.hhmm, startBefore: next };
+  }
+  async function share() {
+    const link = shareLink({ title: `${movie.title}`, label: `the ${show.time.replace(/^0/, "")} show at ${cinema.name}`, url: fromDistrict && movie.districtUrl ? movie.districtUrl : movie.link, want: wantForShow() });
+    setShared((await copy(link)) ? "Link copied. Friends who open it get pinged for this show too." : link);
+  }
   async function watch() {
     setWatching("busy");
     const [h, m] = show.hhmm.split(":").map(Number);
@@ -98,6 +109,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
               </button>
             )
           )}
+          <button className="btn btn-ghost btn-sm" onClick={share} title="Copy a link: friends who open it get pinged for the same show">Share</button>
           <button
             className="btn btn-ghost btn-sm"
             title={`Adds the show with a reminder to leave about ${leaveMinutes(cinema.km)} minutes before`}
@@ -110,6 +122,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
           )}
         </div>
       </div>
+      {shared && <p className="hint" style={{ margin: 0, wordBreak: "break-all" }} role="status">{shared}</p>}
       {seats?.ok && seats.map.length > 0 && (
         <div className="seatmap" aria-label="Seat map, screen at the top">
           <div className="screen-bar">Screen this way</div>
