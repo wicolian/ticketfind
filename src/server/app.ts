@@ -9,6 +9,7 @@ import { inspect, UserError } from "./adapters/index.js";
 import { fetchPage } from "./adapters/page.js";
 import { learnPage, understandWant } from "./ai.js";
 import { engine } from "./engine.js";
+import * as explore from "./explore.js";
 import { sendAlert } from "./notify/index.js";
 import { store } from "./store.js";
 import { DEFAULT_WANT, type Settings } from "./types.js";
@@ -48,6 +49,24 @@ export function buildApp(): Hono {
   });
 
   app.get("/api/state", (c) => c.json({ watches: engine.list(), settings: publicSettings() }));
+
+  // Explore: browse a city, a movie's show times, and live seats for one show.
+  app.get("/api/explore/cities", async (c) => {
+    const list = await explore.cities();
+    const lat = Number(c.req.query("lat")), lng = Number(c.req.query("lng"));
+    const nearest = Number.isFinite(lat) && Number.isFinite(lng) && c.req.query("lat") ? explore.nearestCity(list, { lat, lng })?.name : undefined;
+    return c.json({ cities: list, nearest });
+  });
+  app.get("/api/explore/movies", async (c) => c.json({ movies: await explore.movies(c.req.query("city") || "Chennai") }));
+  app.get("/api/explore/shows", async (c) => {
+    const q = c.req.query();
+    const at = q.lat && q.lng ? { lat: Number(q.lat), lng: Number(q.lng) } : undefined;
+    return c.json(await explore.shows(q.city || "Chennai", q.movie, q.date, at));
+  });
+  app.get("/api/explore/seats", async (c) => {
+    const q = c.req.query();
+    return c.json(await explore.seats(q.city || "Chennai", q.date, q.ref, Number(q.group || 2), Number(q.skip || 0)));
+  });
 
   app.post("/api/inspect", async (c) => {
     const { url } = await c.req.json<{ url: string }>();

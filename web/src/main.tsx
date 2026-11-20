@@ -1,6 +1,8 @@
 import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { api, type PublicSettings, type Watch } from "./api";
+import { api, type City, type Movie, type PublicSettings, type Want, type Watch } from "./api";
+import { ExplorePage } from "./explore/ExplorePage";
+import { MoviePage } from "./explore/MoviePage";
 import { NewWatch } from "./components/NewWatch";
 import { SettingsSheet } from "./components/SettingsSheet";
 import { WatchCard } from "./components/WatchCard";
@@ -25,7 +27,27 @@ function chime() {
   }
 }
 
+type Route = { page: "explore" } | { page: "movie"; id: string } | { page: "watching" };
+function readRoute(): Route {
+  const h = location.hash.replace(/^#\/?/, "");
+  if (h.startsWith("movie/")) return { page: "movie", id: h.slice(6) };
+  if (h === "watching") return { page: "watching" };
+  return { page: "explore" };
+}
+function store<T>(key: string, fallback: T): T {
+  try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
+}
+function keep(key: string, v: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* private window */ }
+}
+
 function App() {
+  const [route, setRoute] = useState<Route>(readRoute);
+  const [city, setCity] = useState<string>(() => store("tf.city", "Chennai"));
+  const [cities, setCities] = useState<City[]>([]);
+  const [where, setWhere] = useState<{ lat: number; lng: number } | undefined>(() => store("tf.where", undefined));
+  const [movie, setMovie] = useState<Movie | null>(null);
+  const [locating, setLocating] = useState(false);
   const [watches, setWatches] = useState<Watch[] | null>(null);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -38,6 +60,43 @@ function App() {
     setToast(t);
     window.setTimeout(() => setToast(""), 3200);
   }, []);
+
+  useEffect(() => {
+    const on = () => setRoute(readRoute());
+    addEventListener("hashchange", on);
+    api.cities().then((r) => setCities(r.cities)).catch(() => {});
+    return () => removeEventListener("hashchange", on);
+  }, []);
+  const go = (h: string) => { location.hash = h; window.scrollTo(0, 0); };
+
+  // A deep link to a movie: find it in the city's list.
+  useEffect(() => {
+    if (route.page !== "movie" || movie?.id === route.id) return;
+    api.movies(city).then((r) => setMovie(r.movies.find((m) => m.id === route.id) ?? null)).catch(() => {});
+  }, [route, city]);
+
+  function locate() {
+    if (!("geolocation" in navigator)) return say("This browser can't share a location.");
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const at = { lat: Math.round(pos.coords.latitude * 1e4) / 1e4, lng: Math.round(pos.coords.longitude * 1e4) / 1e4 };
+        setWhere(at); keep("tf.where", at); setLocating(false);
+        const r = await api.cities(at).catch(() => null);
+        if (r?.nearest) { setCity(r.nearest); keep("tf.city", r.nearest); say(`Showing ${r.nearest}, nearest cinemas first.`); }
+      },
+      () => { setLocating(false); say("Location was blocked. Pick your city instead."); },
+      { timeout: 10_000, maximumAge: 600_000 },
+    );
+  }
+
+  async function watchShow(url: string, want: Want, label: string): Promise<string> {
+    const { platform } = await api.inspect(url);
+    const w = await api.create({ url, platform, want, everySec: 15 });
+    if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
+    say(`Watching ${label}. We'll ping you when seats open.`);
+    return w.id;
+  }
 
   useEffect(() => {
     api
@@ -82,16 +141,35 @@ function App() {
   return (
     <main className="page">
       <header className="top">
-        <div className="brand"><span className="brand-mark"><Ticket size={16} /></span>ticketfind</div>
-        <button className="btn btn-ghost btn-sm" onClick={() => setShowSettings(true)} disabled={!settings}>
-          <Gear size={16} /> Alerts
-        </button>
+        <a className="brand" href="#/" onClick={(e) => { e.preventDefault(); go("/"); }}><span className="brand-mark"><Ticket size={16} /></span>ticketfind</a>
+        <nav className="tabs-nav" aria-label="Main">
+          <a href="#/" aria-current={route.page !== "watching" ? "page" : undefined} onClick={(e) => { e.preventDefault(); go("/"); }}>Explore</a>
+          <a href="#/watching" aria-current={route.page === "watching" ? "page" : undefined} onClick={(e) => { e.preventDefault(); go("/watching"); }}>
+            Watching{watches && watches.length > 0 ? <span className={`nav-count ${found ? "hot" : ""}`}>{found || watches.length}</span> : null}
+          </a>
+        </nav>
+        <div className="top-right">
+          <select className="select city" aria-label="City" value={city} onChange={(e) => { setCity(e.target.value); keep("tf.city", e.target.value); }}>
+            {(cities.length ? cities.map((c) => c.name) : [city]).map((n) => <option key={n}>{n}</option>)}
+          </select>
+          <button className="btn btn-ghost btn-sm" onClick={locate} disabled={locating} title="Use my location">{locating ? "Finding..." : where ? "Near me: on" : "Near me"}</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowSettings(true)} disabled={!settings} aria-label="Alerts"><Gear size={16} /></button>
+        </div>
       </header>
 
-      {loadError ? (
+      {route.page === "explore" ? (
+        <ExplorePage city={city} onOpen={(m) => { setMovie(m); go(`/movie/${m.id}`); }} />
+      ) : route.page === "movie" ? (
+        movie ? (
+          <MoviePage city={city} movie={movie} where={where} onBack={() => go("/")} onLocate={locate} onWatch={watchShow} />
+        ) : (
+          <div className="card empty"><p className="muted">Loading the movie...</p></div>
+        )
+      ) : loadError ? (
         <div className="callout callout-danger" role="alert">{loadError}</div>
       ) : (
         <>
+          <div className="explore-head"><h1 className="page-title">Watching</h1><p className="muted" style={{ margin: 0 }}>Shows ticketfind checks for you. Start one from Explore, or paste any booking link.</p></div>
           <NewWatch aiReady={!!settings?.aiReady} onCreated={(t) => say(`Watching ${t}. We'll ping you when seats open.`)} onOpenSettings={() => setShowSettings(true)} />
 
           {watches && watches.length > 0 && noChannels && (

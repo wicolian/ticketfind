@@ -27,7 +27,24 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
+export interface City { name: string; lat: number; lng: number; cinemas: number }
+export interface Movie { id: string; title: string; poster: string; backdrop: string; certificate: string; languages: string[]; genres: string[]; minutes: number; release: string; advance: boolean; link: string }
+export interface Show { time: string; hhmm: string; language: string; format: string; screen: string; status: "open" | "filling" | "full" | "closed"; statusText: string; ref: string; bookUrl: string }
+export interface CinemaShows { name: string; address: string; km?: number; shows: Show[] }
+export type Seats =
+  | { ok: true; total: number; free: number; freeGood: number; best: string[]; map: { row: string; front: boolean; seats: number[] }[] }
+  | { ok: false; reason: string };
+
+const qs = (o: Record<string, string | number | undefined>) =>
+  Object.entries(o).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
+
 export const api = {
+  cities: (at?: { lat: number; lng: number }) => call<{ cities: City[]; nearest?: string }>("GET", `/api/explore/cities?${qs({ lat: at?.lat, lng: at?.lng })}`),
+  movies: (city: string) => call<{ movies: Movie[] }>("GET", `/api/explore/movies?${qs({ city })}`),
+  shows: (city: string, movie: string, date?: string, at?: { lat: number; lng: number }) =>
+    call<{ days: string[]; date?: string; cinemas: CinemaShows[] }>("GET", `/api/explore/shows?${qs({ city, movie, date, lat: at?.lat, lng: at?.lng })}`),
+  seats: (city: string, date: string, ref: string, group: number, skip: number) =>
+    call<Seats>("GET", `/api/explore/seats?${qs({ city, date, ref, group, skip })}`),
   state: () => call<{ watches: Watch[]; settings: PublicSettings }>("GET", "/api/state"),
   inspect: (url: string) => call<{ platform: Platform; want: Want }>("POST", "/api/inspect", { url }),
   understand: (url: string, text: string, platform: Platform) =>
