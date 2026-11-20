@@ -175,13 +175,13 @@ function App() {
   const shown: Watch[] | null = isPublic ? browser.list.map(asWatch) : watches;
   const found = (shown ?? []).filter((w) => w.status === "found").length;
   useEffect(() => {
-    document.title = found ? `(${found}) Seats open, ticketfind` : "ticketfind";
+    document.title = found ? `(${found}) Seats open, ticketfind` : "ticketfind: find tickets while you're busy";
   }, [found]);
 
   const noChannels = settings && !settings.channels.ntfyTopic && !settings.channels.discordWebhook && !settings.channels.slackWebhook && !settings.channels.telegramChatId;
 
   async function shareApp() {
-    const text = "ticketfind pings you the second seats open at any cinema, so you don't sit refreshing. Free and open source.";
+    const text = "Find tickets while you're busy: ticketfind watches every cinema and pings you the second seats open. Free and open source.";
     try {
       if (navigator.share) { await navigator.share({ title: "ticketfind", text, url: PUBLIC_SITE }); return; }
     } catch (e) {
