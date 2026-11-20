@@ -42,6 +42,7 @@ Add an AI key under **Alerts**, either a [Claude API key](https://console.anthro
 |---|---|---|
 | **PVR INOX** (inoxmovies.com, pvrcinemas.com) | Exact seats. Picks the best block for you. | The page that lists every show time (has `/moviesessions/` in it) |
 | **District** (district.in) | Exact seats too: it reads District's seat map, so the counts never fool you (they can lag). | The movie page that lists every cinema (ends in `-MV` and a number) |
+| **Chains on their own sites** | Exact seats from Miraj, MovieTime, Rajhans, Mukta A2, Gold, Asian, Mayajaal and Rohini, read from each chain's own website. |
 | **Concerts and events** (District events, Eventbrite, Skiddle, Dice, venue sites...) | Watches the event page for words like "Sold out", "Coming soon" or "Book tickets". Add a Claude key and it picks the words for you. | The event page you'd keep refreshing |
 | **With a Jev key** ([TypeSafe](https://typesafe.ai)) | Jev reads concert and event pages and says when tickets can be bought: on sale, sold out, not yet, or unclear. ticketfind pings you only when Jev is at least 70% sure it is on sale. No words to pick. | Add the key under **Alerts** |
 | **Any other page** (buses, sports, plays...) | Same: watches the page for the words that mean "on sale". | The page you'd keep refreshing |

@@ -4,6 +4,7 @@
 import { distanceKm, pickSeats, type Row } from "./rules.js";
 import { BROWSER_UA } from "./adapters/types.js";
 import { districtSeatMap, keyOf, refOf } from "./districtSeats.js";
+import { chainCinemas, chainSeats, isChainRef } from "./chains/index.js";
 
 const API = "https://api3.inoxmovies.com/api/v1/booking/";
 const cache = new Map<string, { at: number; value: unknown }>();
@@ -249,7 +250,7 @@ export interface Show {
   statusText: string;
   ref: string; // the site's encrypted show id, used for seats and booking
   bookUrl: string;
-  source: "pvrinox" | "district";
+  source: "pvrinox" | "district" | "chain";
   free?: number; // District only: its free-seat count
   total?: number;
   /** District only: each seat class with its price and free seats. */
@@ -263,7 +264,9 @@ export interface CinemaShows {
   address: string;
   km?: number;
   shows: Show[];
-  source: "pvrinox" | "district";
+  source: "pvrinox" | "district" | "chain";
+  /** For source "chain": the chain's name, e.g. "Miraj Cinemas". */
+  chain?: string;
 }
 
 function statusOf(txt: string): Show["status"] {
@@ -318,6 +321,41 @@ async function districtShows(movieUrl: string, date: string, at?: { lat: number;
   return out;
 }
 
+const titleFromDistrictUrl = (u: string) => (/movies\/(.+)-movie-tickets-in-/.exec(u)?.[1] ?? "").replace(/-/g, " ");
+
+/** The same cinema can be on District and on its own site: keep the first one found. */
+const cinemaKey = (n: string) => n.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w && !/^(cinemas?|theatres?|the|a\/c|4k|dolby|atmos|laser|rgb)$/.test(w)).slice(0, 2).join(" ");
+function dedupe(have: CinemaShows[], more: CinemaShows[]): CinemaShows[] {
+  const seen = new Set(have.map((c) => cinemaKey(c.name)));
+  return more.filter((c) => !seen.has(cinemaKey(c.name)));
+}
+
+async function chainShows(city: string, title: string, date: string, at?: { lat: number; lng: number }): Promise<CinemaShows[]> {
+  const list = await chainCinemas(city, title, date, at).catch(() => []);
+  return list.map(({ chain, cinema, km }) => ({
+    name: cinema.name,
+    address: cinema.address,
+    km,
+    source: "chain" as const,
+    chain: chain.name,
+    shows: cinema.shows.map((s) => ({
+      time: s.time,
+      hhmm: s.hhmm,
+      language: s.language,
+      format: s.format,
+      screen: "",
+      status: s.status,
+      statusText: s.free !== undefined ? (s.free > 0 ? `${s.free} free` : "Sold out") : s.status === "full" ? "Sold out" : "",
+      ref: s.ref,
+      bookUrl: s.bookUrl,
+      source: "chain" as const,
+      free: s.free,
+      total: s.total,
+      priceFrom: s.priceFrom,
+    })),
+  }));
+}
+
 const cityFromUrl = (u: string) => /-movie-tickets-in-([a-z-]+)-MV/.exec(u)?.[1] ?? "";
 
 /** The next n days starting from a date (YYYY-MM-DD). */
@@ -338,6 +376,7 @@ export async function shows(city: string, movieId: string, date: string | undefi
     const days = firstDay ? daysFrom(firstDay, 4) : [];
     const day = date && days.includes(date) ? date : days[0];
     const cinemas = day ? await districtShows(districtUrl, day, at, true) : [];
+    if (day) cinemas.push(...dedupe(cinemas, await chainShows(city, ms?.movieDetails?.name ?? ms?.meta?.movieName ?? titleFromDistrictUrl(districtUrl), day, at)));
     cinemas.sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity));
     return { days, date: day, cinemas };
   }
@@ -390,6 +429,11 @@ export async function shows(city: string, movieId: string, date: string | undefi
     const more = await districtShows(districtUrl, day, at).catch(() => []);
     cinemas.push(...more);
   }
+  // Chains read from their own websites (Miraj, MovieTime, Mukta A2, Mayajaal ...), unless already listed.
+  if (day) {
+    const title = (await movies(city).catch(() => [])).find((m) => m.id === movieId)?.title ?? "";
+    cinemas.push(...dedupe(cinemas, await chainShows(city, title, day, at)));
+  }
   cinemas.sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity));
   return { days, date: day, cinemas };
 }
@@ -421,6 +465,7 @@ async function districtSeats(ref: string, group: number, skipFrontRows: number) 
 
 export async function seats(city: string, date: string, ref: string, group: number, skipFrontRows: number) {
   if (ref.startsWith("district|")) return districtSeats(ref, group, skipFrontRows);
+  if (isChainRef(ref)) return chainSeats(ref, group, skipFrontRows);
   const res = await post("ticketing/seatlayout", city, { dated: date, encrypted: ref, onPage: false, layoutType: "NEW" }, 10);
   const out = res?.output;
   if (!out?.rows) return { ok: false as const, reason: String(res?.msg || "The cinema did not answer.") };
