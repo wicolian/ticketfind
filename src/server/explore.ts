@@ -201,6 +201,10 @@ export interface Show {
   source: "pvrinox" | "district";
   free?: number; // District only: its free-seat count
   total?: number;
+  /** District only: each seat class with its price and free seats. */
+  classes?: { label: string; price: number; free: number }[];
+  /** Cheapest seat class still on sale, in rupees. */
+  priceFrom?: number;
 }
 
 export interface CinemaShows {
@@ -237,6 +241,8 @@ async function districtShows(movieUrl: string, date: string, at?: { lat: number;
         const hhmm = String(s.showTimeLocal ?? "").slice(11, 16);
         const total = (s.areas ?? []).reduce((n: number, a: any) => n + Number(a.sTotal ?? 0), 0);
         const free = Number(s.avail ?? 0);
+        const classes = (s.areas ?? []).map((a: any) => ({ label: String(a.label ?? "").replace(/\b\w+/g, (w: string) => w[0] + w.slice(1).toLowerCase()), price: Number(a.price ?? 0), free: Number(a.sAvail ?? 0) })).filter((c: any) => c.price > 0);
+        const onSale = classes.filter((c: any) => c.free > 0).map((c: any) => c.price);
         const status: Show["status"] = free <= 0 ? "full" : total && free / total < 0.2 ? "filling" : "open";
         return {
           time: String(s.showTimeText ?? hhmm),
@@ -251,6 +257,8 @@ async function districtShows(movieUrl: string, date: string, at?: { lat: number;
           source: "district" as const,
           free,
           total,
+          classes,
+          priceFrom: onSale.length ? Math.min(...onSale) : undefined,
         } satisfies Show;
       })
       .sort((x: Show, y: Show) => x.hhmm.localeCompare(y.hhmm));
@@ -338,20 +346,29 @@ export async function seats(city: string, date: string, ref: string, group: numb
   const res = await post("ticketing/seatlayout", city, { dated: date, encrypted: ref, onPage: false, layoutType: "NEW" }, 10);
   const out = res?.output;
   if (!out?.rows) return { ok: false as const, reason: String(res?.msg || "The cinema did not answer.") };
+  const classOf = new Map<string, string>(); // "H12" -> "PE-PRIME"
   const rows: Row[] = out.rows
     .filter((r: any) => r.t === "seats" && Array.isArray(r.s))
     .map((r: any) => ({
       name: String(r.n),
       seats: r.s
-        .map((s: any, pos: number) => ({ label: String(s.displaynumber ?? ""), pos, st: s.s }))
+        .map((s: any, pos: number) => ({ label: String(s.displaynumber ?? ""), pos, st: s.s, c: s.c }))
         .filter((s: any) => s.st === 1 || s.st === 2)
-        .map((s: any) => ({ label: s.label, pos: s.pos, free: s.st === 1 })),
+        .map((s: any) => {
+          classOf.set(String(r.n) + s.label, String(s.c ?? ""));
+          return { label: s.label, pos: s.pos, free: s.st === 1 };
+        }),
     }));
+  const priceList: Record<string, any> = out.priceList ?? {};
   const total = rows.reduce((n, r) => n + r.seats.length, 0);
   const freeAll = rows.reduce((n, r) => n + r.seats.filter((s) => s.free).length, 0);
   const pick = pickSeats(rows, { seats: group, together: group > 1, skipFrontRows });
+  const bestClass = pick.seats[0] ? priceList[classOf.get(pick.seats[0]) ?? ""] : undefined;
   return {
     ok: true as const,
+    /** Price of one of the picked seats (what PVR INOX shows, taxes and fee included). */
+    price: bestClass ? Number(bestClass.price) : undefined,
+    classes: Object.values(priceList).map((p: any) => ({ label: String(p.description ?? p.priceCode).replace(/\b\w+/g, (w: string) => w[0] + w.slice(1).toLowerCase()), price: Number(p.price) })).sort((a, b) => a.price - b.price),
     total,
     free: freeAll,
     freeGood: pick.free,

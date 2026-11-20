@@ -4,6 +4,8 @@ import { External } from "../icons";
 
 type Where = { lat: number; lng: number } | undefined;
 
+const rupees = (n: number) => `₹${Math.round(n)}`;
+
 const STATUS: Record<Show["status"], string> = { open: "Seats available", filling: "Filling fast", full: "Sold out", closed: "Not on sale" };
 
 function dayLabel(d: string) {
@@ -64,11 +66,24 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
                 ? <span>The cinema's site isn't answering right now. Seats may still be there: tap Ping me and ticketfind keeps trying.</span>
                 : <span>This show isn't on sale right now ({seats.reason.replace(/^Sorry,?\s*/i, "").replace(/\.$/, "")}). Ping me and ticketfind will check until it is.</span>
             ) : good ? (
-              <span><b className="ok">{seats.freeGood} good seats free.</b> Best for {group}: {seats.best.map((s) => <span key={s} className="seat">{s}</span>)}</span>
+              <span>
+                <b className="ok">{seats.freeGood} good seats free.</b> Best for {group}: {seats.best.map((s) => <span key={s} className="seat">{s}</span>)}
+                {seats.price ? <> {rupees(seats.price)} each, <b>{rupees(seats.price * group)} for {group}</b>.</> : null}
+              </span>
             ) : (
               <span>{seats.free} seats free, but none fit {group > 1 ? `${group} together ` : ""}{skip ? `outside the front ${skip} rows` : ""}.</span>
             )}
           </div>
+          {(() => {
+            const cls = fromDistrict ? show.classes : seats?.ok ? seats.classes?.map((c) => ({ ...c, free: -1 })) : undefined;
+            return cls && cls.length > 0 ? (
+              <div className="prices">
+                {cls.map((c) => (
+                  <span key={c.label} className={`price ${c.free === 0 ? "gone" : ""}`}>{c.label} {rupees(c.price)}{c.free > 0 ? `, ${c.free} free` : c.free === 0 ? ", sold out" : ""}</span>
+                ))}
+              </div>
+            ) : null;
+          })()}
         </div>
         <div className="row">
           {good ? (
@@ -277,6 +292,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
                     >
                       <b>{s.time.replace(/^0/, "")}</b>
                       <span>{s.status === "full" ? "Sold out" : s.source === "district" ? `${s.free} free` : s.screen && s.screen !== "Premium" ? s.screen : s.language}</span>
+                      {s.priceFrom !== undefined && s.status !== "full" && <span className="chip-price">from {rupees(s.priceFrom)}</span>}
                     </button>
                   ))}
                 </div>

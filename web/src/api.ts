@@ -32,10 +32,10 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export interface City { name: string; lat: number; lng: number; cinemas: number }
 export interface Movie { id: string; title: string; poster: string; backdrop: string; certificate: string; languages: string[]; genres: string[]; minutes: number; release: string; advance: boolean; link: string; districtUrl?: string }
-export interface Show { time: string; hhmm: string; language: string; format: string; screen: string; status: "open" | "filling" | "full" | "closed"; statusText: string; ref: string; bookUrl: string; source: "pvrinox" | "district"; free?: number; total?: number }
+export interface Show { time: string; hhmm: string; language: string; format: string; screen: string; status: "open" | "filling" | "full" | "closed"; statusText: string; ref: string; bookUrl: string; source: "pvrinox" | "district"; free?: number; total?: number; classes?: { label: string; price: number; free: number }[]; priceFrom?: number }
 export interface CinemaShows { name: string; address: string; km?: number; shows: Show[]; source: "pvrinox" | "district" }
 export type Seats =
-  | { ok: true; total: number; free: number; freeGood: number; best: string[]; map: { row: string; front: boolean; seats: number[] }[] }
+  | { ok: true; total: number; free: number; freeGood: number; best: string[]; price?: number; classes?: { label: string; price: number }[]; map: { row: string; front: boolean; seats: number[] }[] }
   | { ok: false; reason: string };
 
 const qs = (o: Record<string, string | number | undefined>) =>
