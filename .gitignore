@@ -3,3 +3,9 @@ dist
 *.log
 .DS_Store
 .env
+# Secrets never belong in this repo: API keys, webhook URLs, and ticketfind's own settings.
+.env
+.env.*
+*.env
+.ticketfind/
+settings.json
