@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type CinemaShows, type Movie, type Seats, type Show, type Want } from "../api";
 import { External } from "../icons";
+import { ShareButton } from "../components/ShareInvite";
 
 type Where = { lat: number; lng: number } | undefined;
 
@@ -75,7 +76,7 @@ function SeatPanel({ city, date, show, cinema, group, skip, movie, onWatch, onSt
             <a className="btn btn-primary" href={show.bookUrl} target="_blank" rel="noreferrer">{fromDistrict ? "Book on District" : "Book on PVR INOX"} <External size={14} /></a>
           ) : (
             watching === "done" ? (
-              <span className="row"><span className="done-note" role="status">Watching. We'll ping you when seats open.</span><button className="btn btn-ghost btn-sm" onClick={stop}>Stop</button></span>
+              <span className="row"><span className="done-note" role="status">Watching. We'll ping you when seats open.</span><button className="btn btn-ghost btn-sm" onClick={stop}>Stop</button><ShareButton /></span>
             ) : (
               <button className="btn btn-primary" onClick={watch} disabled={watching === "busy"}>
                 {watching === "busy" ? "Starting..." : "Ping me if seats open"}
@@ -233,7 +234,7 @@ export function MoviePage({ city, movie, where, onBack, onWatch, onLocate, onSto
         {!where && <button className="btn btn-sm" onClick={onLocate}>Sort by distance</button>}
         <div className="prefs-cta">
           {allWatch && allWatch !== "busy" ? (
-            <span className="row"><span className="done-note" role="status">Watching every show that fits</span><button className="btn btn-ghost btn-sm" onClick={async () => { await onStop(allWatch); setAllWatch(""); }}>Stop</button></span>
+            <span className="row"><span className="done-note" role="status">Watching every show that fits</span><button className="btn btn-ghost btn-sm" onClick={async () => { await onStop(allWatch); setAllWatch(""); }}>Stop</button><ShareButton /></span>
           ) : (
             <button className="btn btn-primary btn-sm" onClick={watchAll} disabled={!date || allWatch === "busy"} title="One watch for every show on this date that fits these settings">
               {allWatch === "busy" ? "Starting..." : "Ping me for any show that fits"}

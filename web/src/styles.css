@@ -364,3 +364,21 @@ a { color: inherit; }
 .wmenu-head .pill { padding: 3px 10px; line-height: 1.2; }
 .wmenu-head .pill .dot { flex: none; }
 .src-tag { font-size: 11px; font-weight: 500; color: var(--text-faint); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+
+/* Share with friends */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.share-card { display: flex; align-items: center; gap: 14px; padding: 16px; margin-top: 16px; box-shadow: none; }
+.share-art { flex: none; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-sunk); color: var(--text-muted); }
+.share-copy { flex: 1; min-width: 0; }
+.share-copy h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; }
+.share-copy p { margin: 0; font-size: 14px; color: var(--text-muted); }
+.share-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.share-close { padding: 0; width: 36px; }
+.share-fallback { margin: 0; }
+@media (max-width: 640px) {
+  .share-card { flex-wrap: wrap; align-items: flex-start; position: relative; }
+  .share-copy { flex-basis: calc(100% - 54px); padding-right: 28px; }
+  .share-actions { width: 100%; }
+  .share-actions > .btn:first-child { flex: 1; }
+  .share-close { position: absolute; top: 8px; right: 8px; }
+}

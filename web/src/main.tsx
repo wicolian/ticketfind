@@ -6,6 +6,7 @@ import { MoviePage } from "./explore/MoviePage";
 import { NewWatch } from "./components/NewWatch";
 import { SettingsSheet } from "./components/SettingsSheet";
 import { WatchCard } from "./components/WatchCard";
+import { ShareCard } from "./components/ShareInvite";
 import { BulkActions, WatchingMenu, serverActions, type WatchActions } from "./components/WatchingMenu";
 import { asWatch, useBrowserWatches } from "./browserWatch";
 import { Bell, Pin, Settings as Gear, Ticket } from "./icons";
@@ -229,6 +230,7 @@ function App() {
               .sort((a, b) => Number(b.status === "found") - Number(a.status === "found"))
               .map((w) => <WatchCard key={w.id} w={w} onToast={say} actions={actions} />)
           )}
+          {browser.list.length > 0 && <ShareCard />}
           <p className="hint" style={{ marginTop: 16 }}>Want alerts with the browser closed, or on your phone? Install the optional <a href={`${REPO}#start`} target="_blank" rel="noreferrer">ticketfind app</a>.</p>
         </>
       ) : loadError ? (
@@ -266,6 +268,7 @@ function App() {
               .sort((a, b) => Number(b.status === "found") - Number(a.status === "found"))
               .map((w) => <WatchCard key={w.id} w={w} onToast={say} />)
           )}
+          {watches && watches.length > 0 && <ShareCard />}
         </>
       )}
 
