@@ -103,7 +103,7 @@ a { color: inherit; }
 .nav-count { font-size: 11px; font-weight: 600; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--border); color: var(--text); display: inline-grid; place-items: center; }
 .nav-count.hot { background: var(--ok); color: var(--surface); }
 .top-right { margin-left: auto; display: flex; gap: 4px; align-items: center; }
-.select.city { width: auto; min-height: 36px; padding: 4px 34px 4px 12px; font-weight: 500; }
+.select.city, .select.state { width: auto; min-height: 36px; padding: 4px 34px 4px 12px; font-weight: 500; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
 .brand-mark { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); display: grid; place-items: center; color: #fff; }
 
@@ -408,3 +408,10 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) { .asking-row.is-asking .asking-dot { animation: none; } }
 @media (max-width: 520px) { .asking-row { grid-template-columns: 10px 1fr 52px; } .asking-note { grid-column: 2 / -1; } }
 
+/* Header on narrow screens: state and city share a full row under the brand. */
+@media (max-width: 720px) {
+  .top-right { flex-wrap: wrap; width: 100%; min-width: 0; }
+  .top-right .select.state, .top-right .select.city { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .top-right .select.city + .btn { margin-left: auto; }
+  .near-toggle { white-space: nowrap; }
+}

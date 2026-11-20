@@ -8,6 +8,7 @@ import { SettingsSheet } from "./components/SettingsSheet";
 import { WatchCard } from "./components/WatchCard";
 import { BulkActions, WatchingMenu, serverActions, type WatchActions } from "./components/WatchingMenu";
 import { asWatch, useBrowserWatches } from "./browserWatch";
+import { stateOf } from "./states";
 import { movieFromUrl, readShared } from "./share";
 import { Bell, Pin, Settings as Gear, Ticket } from "./icons";
 import "./styles.css";
@@ -188,8 +189,20 @@ function App() {
           <WatchingMenu watches={shown} current={route.page === "watching"} onOpenPage={() => go("/watching")} onToast={say} actions={actions} />
         </nav>
         <div className="top-right">
+          <select
+            className="select state"
+            aria-label="State"
+            value={stateOf(city)}
+            onChange={(e) => {
+              // A new state jumps to its city with the most cinemas.
+              const best = cities.filter((c) => stateOf(c.name) === e.target.value).sort((x, y) => y.cinemas - x.cinemas)[0];
+              if (best) { setCity(best.name); keep("tf.city", best.name); }
+            }}
+          >
+            {[...new Set((cities.length ? cities.map((c) => c.name) : [city]).map(stateOf))].sort((x, y) => (x === "Other" ? 1 : y === "Other" ? -1 : x.localeCompare(y))).map((st) => <option key={st}>{st}</option>)}
+          </select>
           <select className="select city" aria-label="City" value={city} onChange={(e) => { setCity(e.target.value); keep("tf.city", e.target.value); }}>
-            {(cities.length ? cities.map((c) => c.name) : [city]).map((n) => <option key={n}>{n}</option>)}
+            {(cities.length ? cities.map((c) => c.name).filter((n) => stateOf(n) === stateOf(city)) : [city]).map((n) => <option key={n}>{n}</option>)}
           </select>
           <button
             className="btn btn-ghost btn-sm near-toggle"
