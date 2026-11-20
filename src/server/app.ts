@@ -66,7 +66,12 @@ export function buildApp(): Hono {
     const nearest = Number.isFinite(lat) && Number.isFinite(lng) && c.req.query("lat") ? explore.nearestCity(list, { lat, lng })?.name : undefined;
     return c.json({ cities: list, nearest });
   });
-  app.get("/api/explore/movies", async (c) => c.json({ movies: await explore.movies(c.req.query("city") || "Chennai") }));
+  app.get("/api/explore/movies", async (c) => {
+    const city = c.req.query("city") || "Chennai";
+    const [movies, comingSoon] = await Promise.all([explore.movies(city), explore.comingSoon(city).catch(() => [])]);
+    return c.json({ movies, comingSoon });
+  });
+  app.get("/api/explore/trending", async (c) => c.json({ trending: await explore.trending() }));
   app.get("/api/explore/shows", async (c) => {
     const q = c.req.query();
     const at = q.lat && q.lng ? { lat: Number(q.lat), lng: Number(q.lng) } : undefined;

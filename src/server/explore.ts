@@ -142,6 +142,7 @@ export interface Movie {
   advance: boolean; // tickets on sale before release
   link: string; // where ticketfind watches it: inoxmovies.com, or district.in for District-only movies
   districtUrl?: string; // the District page for the same movie, when District sells it
+  shows?: number; // how many shows PVR INOX runs in the city (popularity)
 }
 
 export async function movies(city: string): Promise<Movie[]> {
@@ -165,6 +166,7 @@ export async function movies(city: string): Promise<Movie[]> {
       advance: isFuture(m.films?.[0]?.releaseDate ?? m.releaseDate),
       link: `https://www.inoxmovies.com/moviesessions/${encodeURIComponent(city)}/${name.replace(/[^A-Za-z0-9]+/g, "-").toUpperCase()}/${id}`,
       districtUrl: byTitle.get(norm(name)) ? DISTRICT + byTitle.get(norm(name))!.url : undefined,
+      shows: Number(m.showCount ?? 0),
     } satisfies Movie;
   });
   // Movies only District sells (often regional films at single screens).
@@ -186,6 +188,54 @@ export async function movies(city: string): Promise<Movie[]> {
     districtUrl: DISTRICT + d.url,
   }));
   return [...pvr, ...districtOnly];
+}
+
+/** Movies whose booking has not opened in the city yet, soonest first. */
+export async function comingSoon(city: string): Promise<Movie[]> {
+  const [res, now] = await Promise.all([post("content/comingsoon", city, { city }, 900), post("content/nowshowing", city, { city }, 300)]);
+  const showing = new Set((now?.output?.mv ?? []).map((m: any) => String(m.films?.[0]?.filmCommonCode ?? m.id)));
+  const list: Movie[] = [];
+  for (const m of res?.output?.movies ?? []) {
+    const id = String(m.films?.[0]?.filmCommonCode ?? m.id ?? "");
+    if (!id || showing.has(id)) continue;
+    const name = String(m.films?.[0]?.filmCommonName ?? m.filmName ?? "").replace(/\s*\(.*$/, "");
+    const langs = new Set<string>();
+    for (const f of m.films ?? []) if (f.language) langs.add(f.language);
+    list.push({
+      id,
+      title: titleCase(name),
+      poster: m.miv ?? "",
+      backdrop: m.mih ?? m.backdropImage ?? "",
+      certificate: m.certificateLk ?? "",
+      languages: [...langs],
+      genres: [],
+      minutes: 0,
+      release: m.releaseDate ?? "",
+      advance: true,
+      link: `https://www.inoxmovies.com/moviesessions/${encodeURIComponent(city)}/${name.replace(/[^A-Za-z0-9]+/g, "-").toUpperCase()}/${id}`,
+      shows: 0,
+    });
+  }
+  return list.sort((a, b) => (Date.parse(a.release) || Infinity) - (Date.parse(b.release) || Infinity)).slice(0, 18);
+}
+
+const BIG_CITIES = ["Chennai", "Mumbai", "Delhi-NCR", "Bengaluru", "Hyderabad", "Kolkata", "Pune"];
+
+/** What's biggest across India right now: total PVR INOX shows in the big cities. */
+export async function trending(): Promise<{ id: string; title: string; poster: string; shows: number; cities: number }[]> {
+  return cached("trending", 600, async () => {
+    const lists = await Promise.all(BIG_CITIES.map((c) => post("content/nowshowing", c, { city: c }, 300).catch(() => null)));
+    const total = new Map<string, { id: string; title: string; poster: string; shows: number; cities: number }>();
+    for (const res of lists)
+      for (const m of res?.output?.mv ?? []) {
+        const id = String(m.films?.[0]?.filmCommonCode ?? m.id);
+        const t = total.get(id) ?? { id, title: titleCase(String(m.films?.[0]?.filmCommonName ?? m.n ?? "")), poster: m.miv ?? "", shows: 0, cities: 0 };
+        t.shows += Number(m.showCount ?? 0);
+        t.cities += 1;
+        total.set(id, t);
+      }
+    return [...total.values()].sort((a, b) => b.shows - a.shows).slice(0, 8);
+  });
 }
 
 export interface Show {
